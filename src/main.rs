@@ -603,7 +603,7 @@ fn main() -> Result<()> {
     let event_loop = EventLoop::new();
     let window_icon = Icon::from_rgba(ICON_BIFROST_RGBA64.to_vec(), 64, 64).ok();
     let window = WindowBuilder::new()
-        .with_title("BIFROST — The Reticulum Ghost Browser (bifrost:// · 0 HTTP PORTS)")
+        .with_title("BIFROST — Zero-IP Ghost Browser · Powered by Reticulum")
         .with_window_icon(window_icon)
         .with_inner_size(tao::dpi::LogicalSize::new(1600.0, 960.0))
         .with_maximized(true)

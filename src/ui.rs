@@ -8,7 +8,7 @@ pub const HOME_HTML: &str = r##"<!DOCTYPE html>
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>BIFROST — The Reticulum Ghost Browser</title>
+<title>BIFROST — Zero-IP Ghost Browser · Powered by Reticulum</title>
 <link rel="icon" type="image/png" href="bifrost://home/icons/bifrost.png" />
 <style>
   :root {
@@ -195,7 +195,7 @@ pub const HOME_HTML: &str = r##"<!DOCTYPE html>
         <img src="bifrost://home/icons/bifrost.png" alt="BIFROST" style="width:62px;height:62px;border-radius:16px;box-shadow:0 0 28px rgba(56,189,248,0.28);border:1px solid rgba(132,204,22,0.42);" />
         <div class="wordmark mono">BIFROST</div>
       </div>
-      <div class="tagline mono">THE RETICULUM GHOST BROWSER · ZERO-IP SOVEREIGN CLIENT · 0 COOKIES · 0 DNS</div>
+      <div class="tagline mono">ZERO-IP GHOST BROWSER · POWERED BY RETICULUM · 0 COOKIES · 0 DNS</div>
       <button type="button" class="new-chat-btn mono" onclick="resetChat()">✦ NEW CHAT</button>
     </div>
 

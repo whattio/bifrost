@@ -3,7 +3,7 @@
 </p>
 
 <h1 align="center">BIFROST</h1>
-<p align="center"><strong>The Reticulum Ghost Browser</strong></p>
+<p align="center"><strong>Zero-IP Ghost Browser · Powered by Reticulum</strong></p>
 <p align="center">
   <em>“Verifiable Credentials protect the passport. Chrome leaks the mission.”</em>
 </p>
