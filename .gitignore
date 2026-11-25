@@ -1,0 +1,8 @@
+/target/
+*.deb
+*.AppImage
+dist/
+.DS_Store
+*.log
+/examples/demo-vault/.ledger/
+/examples/demo-vault/demo_ed25519.pem

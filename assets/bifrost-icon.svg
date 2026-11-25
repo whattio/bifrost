@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Bifrost Ghost Browser Icon">
+  <defs>
+    <linearGradient id="b-bg" x1="16" y1="12" x2="240" y2="244" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#071a1c"/>
+      <stop offset="55%" stop-color="#040c0d"/>
+      <stop offset="100%" stop-color="#020505"/>
+    </linearGradient>
+    <linearGradient id="b-rim" x1="12" y1="12" x2="244" y2="244" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="50%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#84cc16"/>
+    </linearGradient>
+    <linearGradient id="b-arc1" x1="54" y1="158" x2="202" y2="158" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="50%" stop-color="#a78bfa"/>
+      <stop offset="100%" stop-color="#bef264"/>
+    </linearGradient>
+    <linearGradient id="b-arc2" x1="60" y1="166" x2="196" y2="166" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#10b981"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="10" y="10" width="236" height="236" rx="54" fill="url(#b-bg)" stroke="url(#b-rim)" stroke-width="9"/>
+  <rect x="22" y="22" width="212" height="212" rx="44" fill="none" stroke="#38bdf8" stroke-opacity="0.22" stroke-width="2"/>
+
+  <!-- Bifrost Luminous Prism Bridge Arches -->
+  <path d="M58 164 C74 72, 182 72, 198 164" fill="none" stroke="url(#b-arc1)" stroke-width="14" stroke-linecap="round"/>
+  <path d="M72 168 C88 96, 168 96, 184 168" fill="none" stroke="url(#b-arc2)" stroke-width="9" stroke-linecap="round" stroke-opacity="0.9"/>
+  <path d="M88 172 C102 120, 154 120, 168 172" fill="none" stroke="#a78bfa" stroke-width="6" stroke-linecap="round" stroke-opacity="0.85"/>
+
+  <!-- Midgard (Left) & Asgaard/Citadel (Right) Cryptographic Hex Nodes -->
+  <polygon points="58,144 74,153 74,173 58,182 42,173 42,153" fill="#061722" stroke="#38bdf8" stroke-width="5"/>
+  <polygon points="198,144 214,153 214,173 198,182 182,173 182,153" fill="#071b0e" stroke="#bef264" stroke-width="5"/>
+  <circle cx="58" cy="163" r="5" fill="#7dd3fc"/>
+  <circle cx="198" cy="163" r="5" fill="#d9f99d"/>
+</svg>

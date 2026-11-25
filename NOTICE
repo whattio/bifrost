@@ -1,0 +1,22 @@
+# NOTICE — Protocol & Clean-Room Attribution
+
+## Reticulum Wire Protocol Attribution
+BIFROST — The Reticulum Ghost Browser implements communication over the **Public Domain Reticulum Wire Protocol**, invented and published into the public domain by Danish engineer **Mark Qvist** (<https://reticulum.network>).
+
+We give full technical credit to Mark Qvist for creating the Reticulum cryptographic networking architecture.
+
+## Clean-Room MIT Rust Transport Stack
+To maintain full OSI open-source and commercial licensing clarity across enterprise, industrial (EU ESPR / CIRPASS-2), and defense deployments, BIFROST does **not** bundle or depend on Mark Qvist's post-April-2025 Python `RNS` package.
+
+All wire-level Reticulum transport, Curve25519 key exchange (X25519 ECDH + Ed25519 signatures), HDLC framing, and flow control are provided by clean-room, MIT-licensed Rust crates:
+- `citadel-rns-rs` (<https://github.com/whattio/citadel-rns-rs>, MIT License)
+- `reticulum-rs` (MIT License)
+- `ed25519-dalek` & `sha2` (RustCrypto, MIT / Apache-2.0)
+- `wry` & `tao` (Tauri Programme within The Commons Conservancy, MIT / Apache-2.0)
+
+## Dual Licensing
+This repository's source code is dual-licensed under:
+1. **GNU Affero General Public License v3.0 or later (`AGPL-3.0-or-later`)** — see `LICENSE`.
+2. **Commercial License** — see `COMMERCIAL-LICENSE.md` for OEM, white-label, or closed-source enterprise redistribution.
+
+Brand names, logos, and icons are **not** covered by the AGPLv3 grant — see `TRADEMARKS.md`.
