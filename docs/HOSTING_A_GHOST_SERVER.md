@@ -55,3 +55,36 @@ citadel-vault-daemon \
   --rns-peer <OPERATOR_WORKSTATION_IP>:14290
 ```
 Store any optional Bearer API key outside git (`chmod 600 ~/.config/bifrost/llm_api_key`) and launch BIFROST with `--llm-hash <LLM_HASH> --llm-model <MODEL_NAME>`.
+
+## 6. Connecting Across the Internet (Self-Hosted Blind Reticulum Relay)
+On a local LAN or over Sub-GHz LoRa radio, BIFROST and 0-port Ghost Servers connect directly peer-to-peer with zero relays. Across the public internet—where both sides sit behind home/corporate NAT routers or Starlink/5G CGNAT—both sides dial **outbound** to a stateless **Blind Reticulum Transport Relay** (`citadel-rns-relay` from [`whattio/citadel-rns-rs`](https://github.com/whattio/citadel-rns-rs)):
+
+```text
+[Remote BIFROST Browser] ──(outbound, 0 ports)──┐
+                                                ▼
+                                  [Blind citadel-rns-relay]
+                                  (1 TCP port, 0 keys, 0 plaintext)
+                                                ▲
+[0-Port Ghost Linux Server] ──(outbound, 0 ports)┘
+```
+
+1. **Run `citadel-rns-relay` on ONE reachable Linux server** (a compact Debian/Ubuntu micro-server on a fiber connection with TCP `14290` forwarded, or a small VPS):
+   ```bash
+   cargo install --git https://github.com/whattio/citadel-rns-rs.git --bin citadel-rns-relay
+   citadel-rns-relay --identity-name my-relay --listen 0.0.0.0:14290
+   ```
+   *(Multiple relays can peer with each other via repeatable `--peer <host>:14290` flags for multi-site resilience—only one relay needs an inbound router port.)*
+2. **Point your 0-port Ghost Server outbound to the relay:**
+   ```bash
+   citadel-vault-daemon \
+     --identity-name my-ghost-server \
+     --upstream http://127.0.0.1:8080 \
+     --rns-peer <RELAY_HOST>:14290
+   ```
+3. **Launch BIFROST anywhere in the world (0 open ports on the workstation too):**
+   ```bash
+   bifrost-ghost-browser --no-listen --rns-peer <RELAY_HOST>:14290
+   ```
+
+### Why a Blind Reticulum Relay Is Not a Cloudflare Tunnel
+Unlike a corporate zero-trust tunnel (which terminates TLS at vendor servers, decrypts your traffic in vendor RAM, and logs DNS/HTTP metadata), `citadel-rns-relay` **holds zero vault keys, zero user identities, and zero plaintext**. Every `X25519 + Ed25519` Reticulum Link is encrypted end-to-end between your Ghost Server and BIFROST; you own the relay hardware and can swap relays anytime without changing a single `bifrost://<128-bit-hash>` address.

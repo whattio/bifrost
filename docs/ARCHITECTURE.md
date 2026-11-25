@@ -16,6 +16,7 @@ Modern Digital Product Passport initiatives (EU ESPR, CIRPASS-2, W3C Verifiable 
 | **Hard-Blocked Web2 Egress** | `with_navigation_handler` drops every `http://` and `https://` request by default (`[BIFROST-DROP]`). |
 | **RAM-Only Incognito WebView** | `WebViewBuilder::with_incognito(true)` paired with an in-memory `localStorage`/`sessionStorage` shim ensures zero browser state persists to disk. |
 | **Local Rust Verification** | `ironpass://` pulls strictly signed JSON (zero remote HTML/JS) and verifies canonical SHA-256 + RFC 8032 Ed25519 signatures and hash-chained GS1 EPCIS 2.0 ledgers locally via `ed25519-dalek` + `sha2`. |
+| **Same-Origin P2P Hash Dialing** | Ghost Apps running inside BIFROST can discover live mesh peers (`GET /__bifrost_rns/peers`) and dial any peer directly by its 32-hex Reticulum hash (`/__bifrost_rns/<32-hex-hash>/...`) over in-process encrypted Reticulum Links with zero CORS and zero local proxy ports. |
 | **Infrastructure Neutrality** | Runs over any untrusted transport pipe — Fiber, Starlink, 5G, Wi-Fi, or out-of-band Sub-GHz LoRa (~1.7 kbps @ SF9 for ~1.7 KB DPPs & emergency C2). |
 
 ## 3. Wire Flow (CHT2 over Reticulum)

@@ -515,6 +515,74 @@ fn spawn_mesh_handler(
             return;
         }
 
+        // Native Same-Origin Reticulum Hash Dialing for Sovereign Ghost Apps (e.g. Huginn RNS):
+        //   GET  /__bifrost_rns/peers                      -> list live announced Reticulum peers
+        //   ANY  /__bifrost_rns/<32-hex-hash>/<sub_path>   -> dial peer directly over in-process Reticulum Link (0 CORS, 0 proxy sockets)
+        if let Some(rest) = path.strip_prefix("/__bifrost_rns/") {
+            if rest == "peers" || rest == "peers/" {
+                let peers = client.list_peers().await;
+                let payload = serde_json::json!({
+                    "ok": true,
+                    "self_host": host,
+                    "identity": client.identity_name(),
+                    "peers": peers,
+                });
+                responder.respond(json_response(StatusCode::OK, payload.to_string()));
+                return;
+            }
+            let (target_hash, sub_path) = match rest.find('/') {
+                Some(idx) => (&rest[..idx], &rest[idx..]),
+                None => (rest, "/"),
+            };
+            let valid_hash = target_hash.len() == 32 && target_hash.bytes().all(|b| b.is_ascii_hexdigit());
+            if !valid_hash {
+                let out = serde_json::json!({
+                    "ok": false,
+                    "error": format!("Invalid 32-hex Reticulum destination hash: {target_hash}")
+                });
+                responder.respond(json_response(StatusCode::BAD_REQUEST, out.to_string()));
+                return;
+            }
+            let target_lower = target_hash.to_ascii_lowercase();
+            match client
+                .request(&target_lower, &method, sub_path, hdrs, body, Duration::from_secs(25))
+                .await
+            {
+                Ok(resp) => {
+                    let st = StatusCode::from_u16(resp.status).unwrap_or(StatusCode::OK);
+                    let mut builder = Response::builder()
+                        .status(st)
+                        .header("Access-Control-Allow-Origin", "*")
+                        .header("x-bifrost-transport", "reticulum-rs-mit-inprocess-p2p")
+                        .header("x-bifrost-target-hash", &target_lower);
+                    let mut has_ct = false;
+                    for (k, v) in resp.headers {
+                        if k.eq_ignore_ascii_case("content-type") {
+                            has_ct = true;
+                        }
+                        if let (Ok(hn), Ok(hv)) = (
+                            header::HeaderName::from_bytes(k.as_bytes()),
+                            header::HeaderValue::from_str(&v),
+                        ) {
+                            builder = builder.header(hn, hv);
+                        }
+                    }
+                    if !has_ct {
+                        builder = builder.header(header::CONTENT_TYPE, "application/json; charset=utf-8");
+                    }
+                    responder.respond(builder.body(resp.body).unwrap());
+                }
+                Err(e) => {
+                    let out = serde_json::json!({
+                        "ok": false,
+                        "error": format!("Reticulum dial to {target_lower} failed: {e}")
+                    });
+                    responder.respond(json_response(StatusCode::BAD_GATEWAY, out.to_string()));
+                }
+            }
+            return;
+        }
+
         // Live In-Process Reticulum Fetch -> 0-Port Ghost Linux Server
         match client
             .request(&host, &method, &path, hdrs, body, Duration::from_secs(25))
