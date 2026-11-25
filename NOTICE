@@ -1,14 +1,16 @@
 # NOTICE — Protocol & Clean-Room Attribution
 
-## Reticulum Wire Protocol Attribution
-BIFROST — The Reticulum Ghost Browser implements communication over the **Public Domain Reticulum Wire Protocol**, invented and published into the public domain by Danish engineer **Mark Qvist** (<https://reticulum.network>).
+## Reticulum Wire Protocol Attribution & Scope
+BIFROST — The Reticulum Ghost Browser is an **experimental application-layer HTTP/DPP browser (`v0.1.0-preview`)** built on top of the MIT Rust `Reticulum-rs` library and `citadel-rns-rs`. It is **not** a full Reticulum protocol implementation.
 
-We give full technical credit to Mark Qvist for creating the Reticulum cryptographic networking architecture.
+The **Reticulum Protocol** was invented and dedicated to the Public Domain in 2016 by Danish engineer **Mark Qvist** (<https://reticulum.network>), whose Python implementation (<https://github.com/markqvist/Reticulum>) remains the sole authoritative Reference Implementation. We give full credit to Mark Qvist for creating Reticulum.
 
-## Clean-Room MIT Rust Transport Stack
-To maintain full OSI open-source and commercial licensing clarity across enterprise, industrial (EU ESPR / CIRPASS-2), and defense deployments, BIFROST does **not** bundle or depend on Mark Qvist's post-April-2025 Python `RNS` package.
+## Clean-Room Rust Application Stack & Intended Use
+BIFROST is designed strictly for **EU ESPR / CIRPASS-2 Digital Product Passports, industrial resilience, and defensive sovereign privacy** (non-weaponized, zero harm to humans). It does **not** copy, derive from, or train AI models on Mark Qvist's Python `RNS` source code or documentation.
 
-All wire-level Reticulum transport, Curve25519 key exchange (X25519 ECDH + Ed25519 signatures), HDLC framing, and flow control are provided by clean-room, MIT-licensed Rust crates:
+Full wire-level interoperability testing against the official Python `RNS` reference node—and evaluating community-recognized **Quad4 `Reticulum-Go`** as an optional transport backend—is part of our active engineering roadmap.
+
+All Rust crates used by BIFROST are permissive open-source:
 - `citadel-rns-rs` (<https://github.com/whattio/citadel-rns-rs>, MIT License)
 - `reticulum-rs` (MIT License)
 - `ed25519-dalek` & `sha2` (RustCrypto, MIT / Apache-2.0)

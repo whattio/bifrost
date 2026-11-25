@@ -8,14 +8,18 @@
   <em>“Verifiable Credentials protect the passport. Chrome leaks the mission.”</em>
 </p>
 <p align="center">
-  <code>bifrost://</code> &nbsp;·&nbsp; <code>ironpass://</code> &nbsp;·&nbsp; <strong>0 Local HTTP Ports</strong> &nbsp;·&nbsp; <strong>0 DNS</strong> &nbsp;·&nbsp; <strong>0 Cookies</strong> &nbsp;·&nbsp; <strong>Clean-Room Rust</strong>
+  <code>v0.1.0-preview (Experimental Developer Preview)</code> &nbsp;·&nbsp; <code>bifrost://</code> &nbsp;·&nbsp; <code>ironpass://</code> &nbsp;·&nbsp; <strong>0 Local HTTP Ports</strong> &nbsp;·&nbsp; <strong>Clean-Room Rust</strong>
 </p>
+
+> [!NOTE]
+> **Scope & Status (`v0.1.0-preview` — Experimental Developer Preview):**
+> **BIFROST** is an **application-layer HTTP/DPP Ghost Browser** built on top of [`citadel-rns-rs`](https://github.com/whattio/citadel-rns-rs) and the MIT Rust `Reticulum-rs` library. It is **not** a full Reticulum protocol implementation and does not replace Mark Qvist's authoritative Python Reference Implementation ([markqvist/Reticulum](https://github.com/markqvist/Reticulum)). Full wire-level interoperability testing against the official Python `RNS` reference node (and optional support for community-recognized **Quad4 `Reticulum-Go`**) is on the active engineering roadmap. BIFROST is built strictly for **EU ESPR / CIRPASS-2 Digital Product Passports, critical-infrastructure resilience, and defensive sovereign privacy** (non-weaponized).
 
 ---
 
 ## What Is BIFROST?
 
-**BIFROST** (*The Reticulum Ghost Browser*) is **not** a replacement for Chrome. It is a **5 MB Sovereign Zero-IP Client** built in clean-room Rust (`wry` + `tao` + [`citadel-rns-rs`](https://github.com/whattio/citadel-rns-rs)) that closes **“The Last-Meter Leak”** in **CIRPASS-2**, **EU ESPR Digital Product Passports**, and sovereign zero-IP infrastructure:
+**BIFROST** (*The Reticulum Ghost Browser*) is **not** a replacement for Chrome. It is an experimental, human-reviewed **5 MB Sovereign Zero-IP Client** built in Rust (`wry` + `tao` + [`citadel-rns-rs`](https://github.com/whattio/citadel-rns-rs)) that closes **“The Last-Meter Leak”** in **CIRPASS-2**, **EU ESPR Digital Product Passports**, and private sovereign infrastructure:
 
 - **Zero Local HTTP Ports:** Embeds `citadel-rns-rs` directly in-process — zero localhost web proxy sockets (`ss -tlnp` shows no listening HTTP servers).
 - **Zero Web2 / DNS Egress:** Hard-blocks `http://` and `https://` navigation by default. All traffic rides over encrypted **512-bit Curve25519 (X25519 ECDH + Ed25519)** Reticulum links across any untrusted physical pipe (Fiber, Starlink, 5G, Wi-Fi, or Sub-GHz LoRa).
