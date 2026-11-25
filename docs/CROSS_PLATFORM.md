@@ -4,7 +4,7 @@ Because **BIFROST** is built on Rust (`wry` + `tao` + `citadel-rns-rs` + `ed2551
 
 | Platform | WebView Engine | Status | Notes |
 | :--- | :--- | :--- | :--- |
-| **Ubuntu / Debian Linux (`x86_64` & `aarch64`)** | WebKitGTK 4.1 (`libwebkit2gtk-4.1`) | **Ready Today (`v0.1.0`)** | Native `.deb` package + `scripts/install-ubuntu.sh` + `xdg-mime` URI handlers |
+| **Ubuntu / Debian Linux (`x86_64` & `arm64`)** | WebKitGTK 4.1 (`libwebkit2gtk-4.1`) | **Ready Today (`v0.1.0-preview`)** | Native `amd64` & `arm64` `.deb` packages + `scripts/install-ubuntu.sh` + `scripts/install-debian-pi.sh` (auto-enables `WEBKIT_DISABLE_DMABUF_RENDERER=1` on Raspberry Pi 4/5 KMS/Wayland & `-j 2` on <4 GB RAM boards) |
 | **macOS (Apple Silicon & Intel)** | Native Apple `WKWebView` | **Source-Ready (Testing)** | `src/main.rs` already gates `.build_gtk(...)` vs `.build(&window)` via `#[cfg(target_os = "linux")]`. Package via `cargo bundle` into `.app`/`.dmg` with `CFBundleURLTypes` for `bifrost://` & `ironpass://`. |
 | **Windows 10 / 11** | Native Microsoft `WebView2` | **Source-Ready (Testing)** | Compiles directly with MSVC toolchain (`cargo build --release`) into a ~5 MB `.exe` + MSI/NSIS installer registering `bifrost://` & `ironpass://`. |
 | **iOS & Android** | Tauri 2.0 Mobile (`wry` + Native NFC) | **Planned (`v0.2.0`)** | Embeds the exact same `citadel-rns-rs` + `dpp.rs` Rust core inside Tauri 2.0 Mobile with native CoreNFC / Android NFC NTAG 424 DNA tap & camera QR scanning directly into `ironpass://`. |

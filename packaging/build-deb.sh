@@ -16,6 +16,11 @@ ARCH="$(dpkg --print-architecture)"
 STAGE_DIR="$REPO_ROOT/dist/pkg_${PKG_NAME}_${VERSION}_${ARCH}"
 OUT_DEB="$REPO_ROOT/dist/${PKG_NAME}_${VERSION}_${ARCH}.deb"
 
+if [[ -f "$HOME/.cargo/env" ]]; then
+  # shellcheck disable=SC1090
+  source "$HOME/.cargo/env"
+fi
+
 echo "[1/3] Building release binary for ${ARCH}..."
 cargo build --release
 

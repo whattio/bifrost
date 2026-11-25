@@ -60,20 +60,29 @@ flowchart LR
 
 ---
 
-## Quickstart (Ubuntu / Debian Linux)
+## Quickstart (Ubuntu, Debian & Raspberry Pi 64-bit)
 
 ### Option 1 — Install via `.deb` Package (Recommended, 2 seconds)
-Download the latest `.deb` from **Releases** (or build it yourself with `./packaging/build-deb.sh`):
+Download the latest `amd64` (x86_64 PCs) or `arm64` (Qualcomm Ventuno Q & 64-bit Raspberry Pi 4/5) `.deb` from **Releases** (or build locally with `./packaging/build-deb.sh`):
 ```bash
+# x86_64 Ubuntu / Debian:
 sudo apt install ./bifrost-ghost-browser_0.1.0_amd64.deb
+
+# ARM64 (Ventuno Q & 64-bit Raspberry Pi OS / Debian Bookworm):
+./scripts/install-debian-pi.sh --deb ./bifrost-ghost-browser_0.1.0_arm64.deb
 ```
 
 ### Option 2 — One-Command Build & Install Script
-Installs GTK/WebKit2GTK dev headers, compiles **BIFROST**, installs the binary + desktop icon, and registers `bifrost://` and `ironpass://` URI handlers in Ubuntu:
+Installs GTK/WebKit2GTK dev headers, compiles **BIFROST**, installs the binary + desktop icon, and registers `bifrost://` and `ironpass://` URI handlers:
 ```bash
 git clone https://github.com/whattio/bifrost.git
 cd bifrost
+
+# Ubuntu 24.04 (x86_64 or arm64 / Ventuno Q):
 ./scripts/install-ubuntu.sh
+
+# Debian 12/13 & 64-bit Raspberry Pi OS (auto-handles low-RAM & Pi GPU KMS):
+./scripts/install-debian-pi.sh
 ```
 
 ### Option 3 — Instant Built-In Local Showcase (Zero Setup!)

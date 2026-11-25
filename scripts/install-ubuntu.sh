@@ -38,6 +38,11 @@ sudo apt-get install -y \
   libgtk-3-dev libwebkit2gtk-4.1-dev \
   desktop-file-utils xdg-utils
 
+if [[ -f "$HOME/.cargo/env" ]]; then
+  # shellcheck disable=SC1090
+  source "$HOME/.cargo/env"
+fi
+
 if ! command -v cargo >/dev/null 2>&1; then
   echo "[2/5] Installing Rust toolchain via rustup..."
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
