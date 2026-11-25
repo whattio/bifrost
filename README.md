@@ -123,6 +123,9 @@ Ready to test live encrypted Reticulum networking between two processes or two L
 
 ---
 
+## Part of the Free & Open-Source `whatt.io` DPP Ecosystem
+**BIFROST** is the Zero-IP sovereign browser track within the broader **[whatt.io Open-Source DPP Ecosystem](https://github.com/whattio)** — where we are publishing a growing suite of **free and open-source tools and web apps for standard Digital Product Passports (EU ESPR, CIRPASS-2, REACH/SVHC, CRMA, GS1 Digital Link, EPCIS 2.0 & PCM)**, available free at [whattio.app](https://whattio.app), self-hosted via Docker, and open source on [github.com/whattio](https://github.com/whattio).
+
 ## Documentation
 - [**Architecture & Zero-Port Threat Model**](docs/ARCHITECTURE.md)
 - [**Hybrid `#ip=` Tags & IronPass Ledger (GS1 EPCIS 2.0) Specification**](docs/HYBRID_TAGS_AND_LEDGER.md)
