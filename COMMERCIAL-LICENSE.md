@@ -13,4 +13,4 @@ You need a **Commercial License** if you wish to:
 ## Contact
 - Website: <https://citadel.ironpass.tech/>
 - Organization: <https://github.com/whattio>
-- Commercial & Enterprise Licensing: <mailto:licensing@whatt.io>
+- Commercial & Enterprise Licensing: <mailto:info@whatt.io>
