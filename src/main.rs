@@ -10,6 +10,7 @@
 //! - Optional local Sovereign AI Omnibox backed by any OpenAI-compatible NPU/Ollama/llama.cpp peer
 
 mod dpp;
+mod sandbox;
 mod ui;
 
 use anyhow::Result;
@@ -268,6 +269,10 @@ fn spawn_mesh_handler(
                 responder.respond(html_response(StatusCode::OK, ui::HOME_HTML.to_string()));
                 return;
             }
+            if path == "/showcase" || path == "/showcase/" {
+                responder.respond(html_response(StatusCode::OK, sandbox::SHOWCASE_HTML.to_string()));
+                return;
+            }
             if path == "/icons/bifrost.png" {
                 responder.respond(png_response(ICON_BIFROST_PNG));
                 return;
@@ -287,7 +292,7 @@ fn spawn_mesh_handler(
                     .into_iter()
                     .next()
                     .map(|p| p.hash)
-                    .unwrap_or_else(|| "00000000000000000000000000000000".to_string());
+                    .unwrap_or_else(|| "local-demo".to_string());
                 responder.respond(html_response(StatusCode::OK, dpp::render_qr_sheet_html(&vault_hash)));
                 return;
             }
@@ -662,6 +667,51 @@ fn main() -> Result<()> {
             let client = Arc::clone(&client_ironpass);
 
             rt_ironpass.spawn(async move {
+                // Built-in Local Sandbox DPP & Live Hash-Chained IronPass Ledger (zero external servers!)
+                if host.eq_ignore_ascii_case("local-demo") {
+                    let clean_path = path.split('?').next().unwrap_or(&path).trim_matches('/');
+                    if method.eq_ignore_ascii_case("POST") && clean_path.ends_with("/ledger") {
+                        let dpp_id = clean_path
+                            .strip_prefix("dpp/")
+                            .unwrap_or(clean_path)
+                            .strip_suffix("/ledger")
+                            .unwrap_or("battery-01")
+                            .trim_matches('/');
+                        match sandbox::append_sandbox_ledger_event(dpp_id, &body) {
+                            Ok(json_out) => responder.respond(json_response(StatusCode::OK, json_out)),
+                            Err(e) => responder.respond(json_response(
+                                StatusCode::BAD_REQUEST,
+                                serde_json::json!({ "ok": false, "error": e }).to_string(),
+                            )),
+                        }
+                        return;
+                    }
+                    let dpp_id = clean_path.strip_prefix("dpp/").unwrap_or("battery-01").trim_matches('/');
+                    let t0 = Instant::now();
+                    if let Some(raw_json) = sandbox::get_signed_sandbox_dpp_json(dpp_id) {
+                        let latency_ms = t0.elapsed().as_secs_f64() * 1000.0;
+                        let chunks = ((raw_json.len() + 399) / 400).max(1) as u32;
+                        let page = dpp::render_visual_dpp(
+                            &uri,
+                            "local-demo",
+                            &format!("/dpp/{dpp_id}"),
+                            raw_json.len(),
+                            raw_json.len(),
+                            chunks,
+                            false,
+                            latency_ms,
+                            &raw_json,
+                        );
+                        responder.respond(html_response(StatusCode::OK, page));
+                    } else {
+                        responder.respond(html_response(
+                            StatusCode::NOT_FOUND,
+                            "<h1>Sandbox DPP not found</h1><p><a href='bifrost://home/'>← Home</a></p>".into(),
+                        ));
+                    }
+                    return;
+                }
+
                 if method.eq_ignore_ascii_case("POST") || path.trim_end_matches('/').ends_with("/ledger") {
                     let mut hdrs = HashMap::new();
                     hdrs.insert("accept".into(), "application/json".into());

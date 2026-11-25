@@ -217,14 +217,30 @@ pub const HOME_HTML: &str = r##"<!DOCTYPE html>
     </div>
 
     <div class="shortcuts" id="shortcuts">
-      <button type="button" class="shortcut" onclick="openDrawer()">
-        <div class="sc-circle"><img src="bifrost://home/icons/citadel.png" alt="Nodes" style="width:44px;height:44px;border-radius:12px;" /></div>
-        <div class="sc-label">Ghost Nodes</div>
-      </button>
+      <a class="shortcut" href="bifrost://home/showcase">
+        <div class="sc-circle"><img src="bifrost://home/icons/citadel.png" alt="Microsite Example" style="width:44px;height:44px;border-radius:12px;" /></div>
+        <div class="sc-label">Example Microsite</div>
+      </a>
+      <a class="shortcut" href="ironpass://local-demo/dpp/battery-01">
+        <div class="sc-circle"><img src="bifrost://home/icons/ironpass.png" alt="Battery DPP" style="width:44px;height:44px;border-radius:12px;" /></div>
+        <div class="sc-label">Battery DPP + Ledger</div>
+      </a>
+      <a class="shortcut" href="ironpass://local-demo/dpp/drone-01">
+        <div class="sc-circle">🛸</div>
+        <div class="sc-label">UAV MRO DPP</div>
+      </a>
+      <a class="shortcut" href="ironpass://local-demo/dpp/furniture-01">
+        <div class="sc-circle">🪑</div>
+        <div class="sc-label">ESPR Desk DPP</div>
+      </a>
       <a class="shortcut" href="bifrost://home/qr-sheet">
-        <div class="sc-circle"><img src="bifrost://home/icons/ironpass.png" alt="QR Sheet" style="width:44px;height:44px;border-radius:12px;" /></div>
+        <div class="sc-circle">🖨️</div>
         <div class="sc-label">QR Tag Sheet</div>
       </a>
+      <button type="button" class="shortcut" onclick="openDrawer()">
+        <div class="sc-circle">📡</div>
+        <div class="sc-label">Ghost Nodes</div>
+      </button>
     </div>
 
     <section class="chat-thread" id="chat-thread" aria-live="polite"></section>
@@ -372,7 +388,7 @@ async function refreshPeers() {
     } else if (peers.length) {
       qb.innerHTML = peers.map(p => `<a class="qlink holo" href="bifrost://${p.hash}/">🔒 ${escHtml(p.alias)}</a><a class="qlink amber" href="ironpass://${p.hash}/dpp/demo-01">📜 Demo DPP</a>`).join('');
     } else {
-      qb.innerHTML = `<span class="qlink" onclick="openDrawer()">Run examples/demo-vault/server.py + citadel-vault-daemon to connect your first 0-port Ghost node →</span>`;
+      qb.innerHTML = `<a class="qlink holo" href="bifrost://home/showcase">🌐 Example Microsite</a><a class="qlink amber" href="ironpass://local-demo/dpp/battery-01">🔋 Battery DPP + Ledger</a><a class="qlink amber" href="ironpass://local-demo/dpp/drone-01">🛸 UAV DPP</a><a class="qlink" href="bifrost://home/qr-sheet">🖨️ QR Sheet</a>`;
     }
 
     const list = document.getElementById('peers-list');

@@ -26,7 +26,9 @@ pub fn make_qr_svg(data: &str) -> String {
 
 pub fn render_qr_sheet_html(vault_hash: &str) -> String {
     let items = [
-        ("demo-01", "Sovereign Industrial Battery Pack (Demo)", "DEMO-ESPR-001", "https://example.org/dpp/DEMO-ESPR-001"),
+        ("battery-01", "Nordic LFP Industrial Battery Pack (EU Battery Passport)", "EU-BATT-LFP-48V-100", "https://example.org/dpp/EU-BATT-LFP-48V-100"),
+        ("drone-01", "Autonomous Inspection UAV — MRO Grade", "UAV-MRO-INSPECT-01", "https://example.org/dpp/UAV-MRO-INSPECT-01"),
+        ("furniture-01", "Nordic Birch Modular Desk (EU ESPR)", "ESPR-WOOD-DESK-2510", "https://example.org/dpp/ESPR-WOOD-DESK-2510"),
     ];
     let mut cards = String::new();
     for (id, title, sku, pub_url) in items {
@@ -673,9 +675,10 @@ app.innerHTML = `
       <button class="tab" onclick="showView('crypto', this)">🔐 CRYPTO PROOF &amp; JSON</button>
     </div>
     <div class="passport-links mono">
-      <a class="plink" href="ironpass://${esc(PAYLOAD.dest_hash)}/dpp/demo-01">📜 DEMO-01 DPP</a>
-      <a class="plink" href="bifrost://${esc(PAYLOAD.dest_hash)}/">🔒 GHOST SITE</a>
-      <a class="plink" href="bifrost://home/">ᛉ BIFROST HOME</a>
+      <a class="plink" href="ironpass://${esc(PAYLOAD.dest_hash)}/dpp/battery-01">🔋 BATTERY-01</a>
+      <a class="plink" href="ironpass://${esc(PAYLOAD.dest_hash)}/dpp/drone-01">🛸 DRONE-01</a>
+      <a class="plink" href="ironpass://${esc(PAYLOAD.dest_hash)}/dpp/furniture-01">🪑 FURNITURE-01</a>
+      <a class="plink" href="bifrost://home/showcase">🌐 MICROSITE EXAMPLE</a>
     </div>
   </div>
 

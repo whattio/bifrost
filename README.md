@@ -72,8 +72,14 @@ cd bifrost
 ./scripts/install-ubuntu.sh
 ```
 
-### Option 3 — 60-Second Self-Hosted Local Demo (Zero External Servers!)
-BIFROST ships with **zero central servers and zero hardcoded remote hosts**. Test a complete 0-port Ghost Website + Ed25519 DPP + hash-chained **IronPass Ledger** strictly on your own machine:
+### Option 3 — Instant Built-In Local Showcase (Zero Setup!)
+BIFROST ships with **zero central servers and zero hardcoded remote hosts**. The moment you open BIFROST, you can test the entire sovereign experience completely offline using the built-in local showcase:
+- **`bifrost://home/showcase`** — Self-contained readable BIFROST / CITADEL / IRONPASS example microsite
+- **`ironpass://local-demo/dpp/battery-01`** — Live **EU Battery Passport 2027** with real Rust **Ed25519 signature verification**, **Hybrid `#ip=` QR tags**, and an interactive **hash-chained GS1 EPCIS 2.0 IronPass Ledger** (seal new signed events live in RAM!)
+- **`ironpass://local-demo/dpp/drone-01`** & **`ironpass://local-demo/dpp/furniture-01`** — Aerospace MRO & EU ESPR circularity examples
+
+### Option 4 — 60-Second Self-Hosted 0-Port Reticulum Vault
+Ready to test live encrypted Reticulum networking between two processes or two Linux hosts? Run the included localhost-only demo vault (`127.0.0.1:8080`, 0 external ports):
 
 1. **Terminal 1 — Start the localhost-only demo vault (`127.0.0.1:8080`, 0 external ports):**
    ```bash
