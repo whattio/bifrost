@@ -259,10 +259,10 @@ pub const HOME_HTML: &str = r##"<!DOCTYPE html>
       <div class="peer-card" style="border-color:rgba(56,189,248,0.38);">
         <div class="mono" style="font-size:11px;font-weight:800;color:#7dd3fc;">🌐 RETICULUM RELAYS (SAVED TO ~/.config/bifrost/peers.json)</div>
         <div id="relays-list" class="mono" style="font-size:11px;color:var(--muted);">None configured yet.</div>
-        <div style="display:flex;gap:6px;">
-          <input id="relay-addr-input" class="mono" placeholder="host:14290 (e.g. relay.example:14290)" style="flex:1;background:rgba(2,8,5,0.92);border:1px solid var(--border);color:#fff;border-radius:8px;padding:6px 9px;font-size:11px;outline:none;" />
-          <button type="button" class="btn-sm mono" onclick="addRelayPeer()">＋ CONNECT</button>
-        </div>
+        <form onsubmit="event.preventDefault(); addRelayPeer();" style="display:flex;gap:6px;">
+          <input id="relay-addr-input" class="mono" placeholder="IP:port or host:port (e.g. 203.0.113.10:14290)" style="flex:1;background:rgba(2,8,5,0.92);border:1px solid var(--border);color:#fff;border-radius:8px;padding:6px 9px;font-size:11px;outline:none;" />
+          <button type="submit" class="btn-sm mono">＋ CONNECT</button>
+        </form>
         <div id="relay-msg" class="mono" style="font-size:10.5px;color:var(--muted);"></div>
       </div>
       <div id="peers-list" style="display:flex; flex-direction:column; gap:10px;"></div>
@@ -452,8 +452,8 @@ async function handleOmnibox(e) {
     const bodyStr = JSON.stringify({ model: llmModel, enable_thinking: enableThinking, messages: conversation.slice(-12) });
     const encoded = encodeURIComponent(bodyStr);
     const r = encoded.length <= 6000
-      ? await fetch(`bifrost://home/api/ai-chat?payload=${encoded}`, { cache: 'no-store' })
-      : await fetch('bifrost://home/api/ai-chat', {
+      ? await fetch(`/api/ai-chat?payload=${encoded}&_t=${Date.now()}`)
+      : await fetch('/api/ai-chat', {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
           body: bodyStr,
@@ -522,7 +522,7 @@ function parseInviteCardInput() {
 }
 async function refreshContacts() {
   try {
-    const r = await fetch('bifrost://home/api/contacts', { cache: 'no-store' });
+    const r = await fetch(`/api/contacts?_t=${Date.now()}`);
     const d = await r.json();
     savedContacts = d.contacts || [];
     const btn = document.getElementById('contacts-btn');
@@ -565,11 +565,12 @@ async function saveContact() {
   if (label) params.set('label', label);
   if (hash) params.set('hash', hash);
   if (notes) params.set('notes', notes);
+  params.set('_t', String(Date.now()));
   msg.style.color = 'var(--muted)';
   msg.textContent = 'Saving...';
   try {
-    // Use simple GET query-params so macOS WKWebView custom-scheme handlers never strip POST bodies or block CORS preflight
-    const r = await fetch(`bifrost://home/api/contacts/save?${params.toString()}`, { cache: 'no-store' });
+    // Plain same-origin GET (no custom headers / no cache option -> zero WebKit CORS preflight on macOS)
+    const r = await fetch(`/api/contacts/save?${params.toString()}`);
     const d = await r.json();
     if (!d.ok) { msg.style.color = 'var(--danger)'; msg.textContent = d.error || 'Could not save contact.'; return; }
     savedContacts = d.contacts || [];
@@ -579,11 +580,23 @@ async function saveContact() {
     msg.textContent = `Saved locally (${savedContacts.length} contacts in ~/.config/bifrost/contacts.json).`;
     renderContactsList();
     refreshPeers();
-  } catch (e) { msg.style.color = 'var(--danger)'; msg.textContent = `Save error: ${e}`; }
+  } catch (e) {
+    // Native Wry IPC fallback (zero HTTP / zero fetch)
+    if (window.ipc && window.ipc.postMessage) {
+      window.ipc.postMessage(JSON.stringify({ cmd: 'save_contact', card, petname, label, hash, notes }));
+      ['cb-card','cb-petname','cb-label','cb-hash','cb-notes'].forEach(id => document.getElementById(id).value = '');
+      msg.style.color = 'var(--lime)';
+      msg.textContent = 'Saved via native IPC (~/.config/bifrost/contacts.json).';
+      setTimeout(() => { refreshContacts(); refreshPeers(); }, 200);
+    } else {
+      msg.style.color = 'var(--danger)';
+      msg.textContent = `Save error: ${e}`;
+    }
+  }
 }
 async function deleteContact(petname) {
   try {
-    const r = await fetch(`bifrost://home/api/contacts/delete?petname=${encodeURIComponent(petname)}`, { cache: 'no-store' });
+    const r = await fetch(`/api/contacts/delete?petname=${encodeURIComponent(petname)}&_t=${Date.now()}`);
     const d = await r.json();
     if (d.ok) {
       savedContacts = d.contacts || [];
@@ -592,8 +605,13 @@ async function deleteContact(petname) {
       refreshPeers();
     }
   } catch (e) {
-    const msg = document.getElementById('cb-msg');
-    if (msg) { msg.style.color = 'var(--danger)'; msg.textContent = `Delete error: ${e}`; }
+    if (window.ipc && window.ipc.postMessage) {
+      window.ipc.postMessage(JSON.stringify({ cmd: 'delete_contact', petname }));
+      setTimeout(() => { refreshContacts(); refreshPeers(); }, 200);
+    } else {
+      const msg = document.getElementById('cb-msg');
+      if (msg) { msg.style.color = 'var(--danger)'; msg.textContent = `Delete error: ${e}`; }
+    }
   }
 }
 function renderContactsList() {
@@ -630,31 +648,52 @@ async function addRelayPeer() {
   const msg = document.getElementById('relay-msg');
   const addr = (inp.value || '').trim();
   if (!addr) return;
+  if (!addr.includes(':')) {
+    msg.style.color = 'var(--danger)';
+    msg.textContent = 'Include port, e.g. 203.0.113.10:14290';
+    return;
+  }
   msg.style.color = 'var(--muted)';
   msg.textContent = `Dialing ${addr}...`;
   try {
-    const r = await fetch(`bifrost://home/api/relays/add?addr=${encodeURIComponent(addr)}`, { cache: 'no-store' });
+    const r = await fetch(`/api/relays/add?addr=${encodeURIComponent(addr)}&_t=${Date.now()}`);
     const d = await r.json();
     if (!d.ok) { msg.style.color = 'var(--danger)'; msg.textContent = d.error || 'Could not add relay.'; return; }
     inp.value = '';
     msg.style.color = 'var(--lime)';
     msg.textContent = `Connected & saved ${addr} — waiting for peer announces (~2s)...`;
     refreshPeers();
-  } catch (e) { msg.style.color = 'var(--danger)'; msg.textContent = `Relay error: ${e}`; }
+  } catch (e) {
+    if (window.ipc && window.ipc.postMessage) {
+      window.ipc.postMessage(JSON.stringify({ cmd: 'add_relay', addr }));
+      inp.value = '';
+      msg.style.color = 'var(--lime)';
+      msg.textContent = `Connected & saved ${addr} via native IPC — waiting for peers (~2s)...`;
+      setTimeout(refreshPeers, 400);
+    } else {
+      msg.style.color = 'var(--danger)';
+      msg.textContent = `Relay error: ${e}`;
+    }
+  }
 }
 
 async function removeRelayPeer(addr) {
   try {
-    await fetch(`bifrost://home/api/relays/remove?addr=${encodeURIComponent(addr)}`, { cache: 'no-store' });
+    await fetch(`/api/relays/remove?addr=${encodeURIComponent(addr)}&_t=${Date.now()}`);
     const msg = document.getElementById('relay-msg');
     if (msg) { msg.style.color = 'var(--amber)'; msg.textContent = `Removed ${addr} from saved relays (takes effect next launch).`; }
     refreshPeers();
-  } catch (_) {}
+  } catch (_) {
+    if (window.ipc && window.ipc.postMessage) {
+      window.ipc.postMessage(JSON.stringify({ cmd: 'remove_relay', addr }));
+      setTimeout(refreshPeers, 250);
+    }
+  }
 }
 
 async function refreshPeers() {
   try {
-    const r = await fetch('bifrost://home/api/peers', { cache: 'no-store' });
+    const r = await fetch(`/api/peers?_t=${Date.now()}`);
     const d = await r.json();
     llmHash = d.llm_hash || null;
     if (d.llm_model) llmModel = d.llm_model;

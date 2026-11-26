@@ -502,7 +502,7 @@ fn spawn_mesh_handler(
                 responder.respond(html_response(StatusCode::OK, dpp::render_qr_sheet_html(&vault_hash)));
                 return;
             }
-            if path == "/api/peers" {
+            if path == "/api/peers" || path.starts_with("/api/peers?") {
                 let peers = client.list_peers().await;
                 let bookmarks = load_user_bookmarks();
                 let detected_llm = ctx.llm_hash.clone().or_else(|| {
@@ -1079,10 +1079,63 @@ fn main() -> Result<()> {
         .replace("{{BIFROST_SHORT_TAG}}", env!("BIFROST_SHORT_TAG"))
         .replace("{{BIFROST_BUILD_TAG}}", env!("BIFROST_BUILD_TAG"));
 
+    let rt_ipc = Arc::clone(&rt);
+    let client_ipc = Arc::clone(&rns_client);
+
     let builder = WebViewBuilder::with_web_context(&mut web_context)
         .with_incognito(true)
         .with_devtools(true)
         .with_initialization_script(&hud_script)
+        .with_ipc_handler(move |req: Request<String>| {
+            // Only accept native IPC mutations from the local bifrost://home/ UI
+            let origin_uri = req.uri().to_string();
+            if !origin_uri.is_empty() && !origin_uri.starts_with("bifrost://home") && !origin_uri.starts_with("citadel://home") {
+                return;
+            }
+            let Ok(v) = serde_json::from_str::<serde_json::Value>(req.body()) else {
+                return;
+            };
+            let cmd = v.get("cmd").and_then(|c| c.as_str()).unwrap_or("");
+            match cmd {
+                "add_relay" => {
+                    let addr = v.get("addr").and_then(|s| s.as_str()).unwrap_or("").trim().to_string();
+                    if !addr.is_empty() && addr.contains(':') {
+                        let mut saved = load_saved_relays();
+                        if !saved.iter().any(|x| x == &addr) {
+                            saved.push(addr.clone());
+                            save_relays(&saved);
+                        }
+                        let c = Arc::clone(&client_ipc);
+                        rt_ipc.spawn(async move {
+                            c.connect_peer(&addr).await;
+                        });
+                    }
+                }
+                "remove_relay" => {
+                    let addr = v.get("addr").and_then(|s| s.as_str()).unwrap_or("").trim().to_string();
+                    if !addr.is_empty() {
+                        let mut saved = load_saved_relays();
+                        saved.retain(|x| x != &addr);
+                        save_relays(&saved);
+                    }
+                }
+                "save_contact" => {
+                    let petname = v.get("petname").and_then(|s| s.as_str()).unwrap_or("").to_string();
+                    let label = v.get("label").and_then(|s| s.as_str()).unwrap_or("").to_string();
+                    let hash = v.get("hash").and_then(|s| s.as_str()).unwrap_or("").to_string();
+                    let scheme = v.get("scheme").and_then(|s| s.as_str()).unwrap_or("bifrost").to_string();
+                    let cpath = v.get("path").and_then(|s| s.as_str()).unwrap_or("/").to_string();
+                    let notes = v.get("notes").and_then(|s| s.as_str()).unwrap_or("").to_string();
+                    let card = v.get("card").and_then(|s| s.as_str());
+                    let _ = upsert_contact_from_fields(petname, label, hash, scheme, cpath, notes, card);
+                }
+                "delete_contact" => {
+                    let petname = v.get("petname").and_then(|s| s.as_str()).unwrap_or("");
+                    let _ = contacts::delete_contact(petname);
+                }
+                _ => {}
+            }
+        })
         .with_navigation_handler(move |url: String| {
             if url.starts_with("bifrost://")
                 || url.starts_with("citadel://")
