@@ -178,7 +178,7 @@ pub const HOME_HTML: &str = r##"<!DOCTYPE html>
         <span id="npu-status-text">LOCAL AI PEER · OPTIONAL</span>
       </span>
       <span class="status-chip">0 HTTP PORTS</span>
-      <span class="status-chip">WEB2 BLOCKED</span>
+      <span class="status-chip" id="ifac-chip">IFAC: OFF</span>
       <span class="status-chip" style="border-color:rgba(56,189,248,0.48);background:rgba(56,189,248,0.12);color:#bae6fd;" title="Synced with GitHub Cargo.toml + Git commit SHA">{{BIFROST_BUILD_TAG}}</span>
     </div>
     <div class="top-right">
@@ -269,6 +269,14 @@ pub const HOME_HTML: &str = r##"<!DOCTYPE html>
       <div class="mono" style="font-size:11px; color:var(--muted);">
         Zero-DNS local petnames stored on this device (<code>~/.config/bifrost/contacts.json</code>). Type <code>bifrost://&lt;petname&gt;/</code> or paste a <code>bifrost-card://</code> invite.
       </div>
+      <div class="peer-card" style="border-color:rgba(56,189,248,0.42);">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+          <div class="mono" style="font-size:11px;font-weight:800;color:#7dd3fc;">🔑 MY DEVICE ED25519 CLIENT ID (LOCK 2)</div>
+          <button type="button" class="btn-sm mono" onclick="copyMyClientId()">📋 COPY ID</button>
+        </div>
+        <div class="hash-box mono" id="my-client-id">loading...</div>
+        <div class="mono" style="font-size:10px;color:var(--muted);">Share this ID with a private vault owner (<code>allowed_clients.txt</code>) to authorize this device.</div>
+      </div>
       <div class="peer-card" style="border-color:rgba(132,204,22,0.38);">
         <div class="mono" style="font-size:11px; font-weight:800; color:var(--lime);">＋ ADD CONTACT OR PASTE INVITE CARD</div>
         <input id="cb-card" class="mono" placeholder="Paste bifrost-card://... or bifrost://<hash>/" oninput="parseInviteCardInput()" style="background:rgba(2,8,5,0.92);border:1px solid var(--border);color:#fff;border-radius:8px;padding:7px 9px;font-size:11px;outline:none;" />
@@ -295,6 +303,12 @@ let llmHash = null;
 let llmModel = 'qwen3-4b-npu';
 let savedContacts = [];
 let latestPeers = [];
+let myClientId = '';
+async function copyMyClientId() {
+  if (!myClientId) return;
+  try { await navigator.clipboard.writeText(myClientId); const m = document.getElementById('cb-msg'); if (m) { m.style.color = 'var(--lime)'; m.textContent = 'Copied your Ed25519 Device ID!'; } }
+  catch { prompt('Your Ed25519 Device Client ID:', myClientId); }
+}
 
 function findContactByPetname(raw) {
   const key = (raw || '').trim().toLowerCase().replace(/^@/, '');
@@ -556,6 +570,21 @@ async function refreshPeers() {
     const d = await r.json();
     llmHash = d.llm_hash || null;
     if (d.llm_model) llmModel = d.llm_model;
+    if (d.client_id) {
+      myClientId = d.client_id;
+      const cidEl = document.getElementById('my-client-id');
+      if (cidEl) cidEl.textContent = d.client_id;
+    }
+    const ifacEl = document.getElementById('ifac-chip');
+    if (ifacEl) {
+      if (d.ifac_fingerprint) {
+        ifacEl.className = 'status-chip online';
+        ifacEl.textContent = `🔒 IFAC: ${d.ifac_fingerprint}`;
+      } else {
+        ifacEl.className = 'status-chip waiting';
+        ifacEl.textContent = 'IFAC: OFF';
+      }
+    }
     const peers = d.peers || [];
     latestPeers = peers;
     renderContactsList();

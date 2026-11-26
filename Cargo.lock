@@ -205,7 +205,7 @@ checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
 
 [[package]]
 name = "bifrost-ghost-browser"
-version = "0.1.0"
+version = "0.3.0-preview"
 dependencies = [
  "anyhow",
  "citadel-rns-rs",
@@ -393,17 +393,21 @@ dependencies = [
 [[package]]
 name = "citadel-rns-rs"
 version = "0.5.0"
-source = "git+https://github.com/whattio/citadel-rns-rs.git?branch=main#bcbe061b9d313c5705aae6ca48788eeb25a91f12"
+source = "git+https://github.com/whattio/citadel-rns-rs.git?branch=main#35901b764c533da154b425c6c7346c12e2421400"
 dependencies = [
  "anyhow",
  "axum",
  "clap",
+ "ed25519-dalek",
  "flate2",
  "futures-util",
+ "hmac",
+ "rand_core 0.6.4",
  "reqwest",
  "reticulum",
  "serde",
  "serde_json",
+ "sha2",
  "tokio",
  "tracing",
  "tracing-subscriber",

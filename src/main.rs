@@ -16,6 +16,7 @@ mod ui;
 
 use anyhow::Result;
 use citadel_rns_rs::client::CitadelRnsClient;
+use citadel_rns_rs::security::{ClientIdentity, IfacKey};
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -81,6 +82,22 @@ struct Args {
     /// Optional Bearer API key for local LLM peer (also auto-loaded from ~/.config/bifrost/llm_api_key)
     #[arg(long, env = "BIFROST_LLM_API_KEY")]
     llm_api_key: Option<String>,
+
+    /// Lock 1 (IFAC): Path to shared dark-network key file (chmod 600)
+    #[arg(long = "ifac-key-file", env = "CITADEL_IFAC_KEY_FILE")]
+    ifac_key_file: Option<PathBuf>,
+
+    /// Lock 1 (IFAC): Inline shared network passphrase (prefer --ifac-key-file)
+    #[arg(long = "ifac-key", env = "CITADEL_IFAC_KEY")]
+    ifac_key: Option<String>,
+
+    /// Lock 2 (Ed25519 Mutual Auth): Optional custom path for persistent client Ed25519 keypair
+    #[arg(long = "client-key-file", env = "BIFROST_CLIENT_KEY_FILE")]
+    client_key_file: Option<PathBuf>,
+
+    /// Print this device's persistent 32-hex Ed25519 Client ID (for vault --allow-client) and exit
+    #[arg(long, default_value_t = false)]
+    print_client_id: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -318,6 +335,9 @@ fn spawn_mesh_handler(
                     "version": env!("BIFROST_VERSION"),
                     "git_sha": env!("BIFROST_GIT_SHA"),
                     "build_tag": env!("BIFROST_BUILD_TAG"),
+                    "client_id": client.client_id(),
+                    "client_pubkey_hex": client.client_pubkey_hex(),
+                    "ifac_fingerprint": client.ifac_fingerprint(),
                     "identity": client.identity_name(),
                     "rns_listen": ctx.listen_label,
                     "allow_hashes": ctx.allow_label,
@@ -721,6 +741,14 @@ fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
     let args = Args::parse();
 
+    let client_identity = ClientIdentity::load_or_create(args.client_key_file.as_deref())?;
+    if args.print_client_id {
+        println!("{}", client_identity.client_id());
+        return Ok(());
+    }
+    let ifac: Option<Arc<IfacKey>> =
+        IfacKey::resolve(args.ifac_key.as_deref(), args.ifac_key_file.as_deref())?.map(Arc::new);
+
     let initial_url = args
         .positional_url
         .as_deref()
@@ -734,11 +762,13 @@ fn main() -> Result<()> {
         Some(args.rns_listen.clone())
     };
 
-    let rns_client: Arc<CitadelRnsClient> = rt.block_on(CitadelRnsClient::start(
+    let rns_client: Arc<CitadelRnsClient> = rt.block_on(CitadelRnsClient::start_with_security(
         &args.identity_name,
         rns_listen_opt.clone(),
         args.rns_peers.clone(),
         args.allow_hashes.clone(),
+        ifac,
+        client_identity,
     ));
 
     info!(
