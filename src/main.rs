@@ -35,7 +35,7 @@ use wry::WebViewBuilderExtUnix;
 
 #[derive(Parser, Debug, Clone)]
 #[command(name = "bifrost-ghost-browser")]
-#[command(version)]
+#[command(version = env!("BIFROST_BUILD_TAG"))]
 #[command(about = "BIFROST — The Reticulum Ghost Browser (bifrost:// & ironpass://)")]
 struct Args {
     /// Optional Zero-IP URI passed as positional argument (e.g. from xdg-mime / OS handler)
@@ -267,7 +267,11 @@ fn spawn_mesh_handler(
     rt.spawn(async move {
         if host.eq_ignore_ascii_case("home") {
             if path == "/" || path == "/index.html" {
-                responder.respond(html_response(StatusCode::OK, ui::HOME_HTML.to_string()));
+                let html = ui::HOME_HTML
+                    .replace("{{BIFROST_VERSION}}", env!("BIFROST_VERSION"))
+                    .replace("{{BIFROST_SHORT_TAG}}", env!("BIFROST_SHORT_TAG"))
+                    .replace("{{BIFROST_BUILD_TAG}}", env!("BIFROST_BUILD_TAG"));
+                responder.respond(html_response(StatusCode::OK, html));
                 return;
             }
             if path == "/showcase" || path == "/showcase/" {
@@ -311,6 +315,9 @@ fn spawn_mesh_handler(
                 });
                 let payload = serde_json::json!({
                     "ok": true,
+                    "version": env!("BIFROST_VERSION"),
+                    "git_sha": env!("BIFROST_GIT_SHA"),
+                    "build_tag": env!("BIFROST_BUILD_TAG"),
                     "identity": client.identity_name(),
                     "rns_listen": ctx.listen_label,
                     "allow_hashes": ctx.allow_label,
@@ -742,8 +749,13 @@ fn main() -> Result<()> {
 
     let event_loop = EventLoop::new();
     let window_icon = Icon::from_rgba(ICON_BIFROST_RGBA64.to_vec(), 64, 64).ok();
+    let window_title = format!(
+        "BIFROST {} ({}) — Zero-IP Ghost Browser · Powered by Reticulum",
+        env!("BIFROST_VERSION"),
+        env!("BIFROST_GIT_SHA")
+    );
     let window = WindowBuilder::new()
-        .with_title("BIFROST — Zero-IP Ghost Browser · Powered by Reticulum")
+        .with_title(window_title)
         .with_window_icon(window_icon)
         .with_inner_size(tao::dpi::LogicalSize::new(1600.0, 960.0))
         .with_maximized(true)
@@ -772,10 +784,14 @@ fn main() -> Result<()> {
 
     let allow_web2 = args.allow_web2;
 
+    let hud_script = ui::HUD_INIT_SCRIPT
+        .replace("{{BIFROST_SHORT_TAG}}", env!("BIFROST_SHORT_TAG"))
+        .replace("{{BIFROST_BUILD_TAG}}", env!("BIFROST_BUILD_TAG"));
+
     let builder = WebViewBuilder::with_web_context(&mut web_context)
         .with_incognito(true)
         .with_devtools(true)
-        .with_initialization_script(ui::HUD_INIT_SCRIPT)
+        .with_initialization_script(&hud_script)
         .with_navigation_handler(move |url: String| {
             if url.starts_with("bifrost://")
                 || url.starts_with("citadel://")

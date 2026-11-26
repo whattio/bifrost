@@ -179,6 +179,7 @@ pub const HOME_HTML: &str = r##"<!DOCTYPE html>
       </span>
       <span class="status-chip">0 HTTP PORTS</span>
       <span class="status-chip">WEB2 BLOCKED</span>
+      <span class="status-chip" style="border-color:rgba(56,189,248,0.48);background:rgba(56,189,248,0.12);color:#bae6fd;" title="Synced with GitHub Cargo.toml + Git commit SHA">{{BIFROST_BUILD_TAG}}</span>
     </div>
     <div class="top-right">
       <button type="button" class="top-btn mono" id="think-toggle" onclick="toggleThinking()">🧠 THINK: OFF</button>
@@ -195,6 +196,7 @@ pub const HOME_HTML: &str = r##"<!DOCTYPE html>
       <div class="brand-lockup">
         <img src="bifrost://home/icons/bifrost.png" alt="BIFROST" style="width:62px;height:62px;border-radius:16px;box-shadow:0 0 28px rgba(56,189,248,0.28);border:1px solid rgba(132,204,22,0.42);" />
         <div class="wordmark mono">BIFROST</div>
+        <span class="mono" style="padding:4px 10px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:0.06em;background:rgba(56,189,248,0.14);border:1px solid rgba(56,189,248,0.5);color:#7dd3fc;">{{BIFROST_SHORT_TAG}}</span>
       </div>
       <div class="tagline mono">ZERO-IP GHOST BROWSER · POWERED BY RETICULUM · 0 COOKIES · 0 DNS</div>
       <button type="button" class="new-chat-btn mono" onclick="resetChat()">✦ NEW CHAT</button>
@@ -668,6 +670,7 @@ pub const HUD_INIT_SCRIPT: &str = r#"
 
     bar.innerHTML = `
       <button id="__bf_home" style="background:rgba(132,204,22,0.18);border:1px solid rgba(132,204,22,0.55);color:#bef264;border-radius:6px;padding:3px 9px;cursor:pointer;font-weight:800;font-family:inherit;font-size:11px;white-space:nowrap;">ᛉ BIFROST</button>
+      <span title="{{BIFROST_BUILD_TAG}}" style="padding:2px 7px;border-radius:999px;background:rgba(56,189,248,0.14);border:1px solid rgba(56,189,248,0.45);color:#7dd3fc;font-size:10px;font-weight:800;white-space:nowrap;">{{BIFROST_SHORT_TAG}}</span>
       <button id="__bf_back" style="background:transparent;border:1px solid rgba(16,185,129,0.4);color:#a7f3d0;border-radius:6px;padding:3px 7px;cursor:pointer;font-family:inherit;">←</button>
       <button id="__bf_reload" style="background:transparent;border:1px solid rgba(16,185,129,0.4);color:#a7f3d0;border-radius:6px;padding:3px 7px;cursor:pointer;font-family:inherit;">↻</button>
       <input id="__bf_addr" style="flex:1;min-width:120px;background:rgba(0,0,0,0.65);border:1px solid rgba(56,189,248,0.4);color:#e0f2fe;border-radius:6px;padding:4px 9px;font-family:inherit;font-size:11.5px;outline:none;" />
