@@ -9,6 +9,7 @@
 //! - Local Rust verification of Ed25519-signed EU ESPR DPPs & hash-chained GS1 EPCIS 2.0 Ledgers
 //! - Optional local Sovereign AI Omnibox backed by any OpenAI-compatible NPU/Ollama/llama.cpp peer
 
+mod contacts;
 mod dpp;
 mod sandbox;
 mod ui;
@@ -321,6 +322,74 @@ fn spawn_mesh_handler(
                 responder.respond(json_response(StatusCode::OK, payload.to_string()));
                 return;
             }
+            if path == "/api/contacts" || path.starts_with("/api/contacts?") {
+                if method.eq_ignore_ascii_case("GET") {
+                    let list = contacts::load_contacts();
+                    let payload = serde_json::json!({
+                        "ok": true,
+                        "file": contacts::contacts_file_path().display().to_string(),
+                        "contacts": list,
+                    });
+                    responder.respond(json_response(StatusCode::OK, payload.to_string()));
+                    return;
+                }
+                if method.eq_ignore_ascii_case("POST") {
+                    let req_json: serde_json::Value = match serde_json::from_slice(&body) {
+                        Ok(v) => v,
+                        Err(e) => {
+                            let out = serde_json::json!({ "ok": false, "error": format!("Invalid JSON: {e}") });
+                            responder.respond(json_response(StatusCode::BAD_REQUEST, out.to_string()));
+                            return;
+                        }
+                    };
+                    let mut petname = req_json.get("petname").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    let mut label = req_json.get("label").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    let mut hash = req_json.get("hash").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    let mut scheme = req_json.get("scheme").and_then(|v| v.as_str()).unwrap_or("bifrost").to_string();
+                    let mut cpath = req_json.get("path").and_then(|v| v.as_str()).unwrap_or("/").to_string();
+                    let mut notes = req_json.get("notes").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    if let Some(card) = req_json.get("card").and_then(|v| v.as_str()) {
+                        if let Some(rest) = card.trim().strip_prefix("bifrost-card://") {
+                            let (main_part, query_part) = match rest.split_once('?') {
+                                Some((m, q)) => (m, Some(q)),
+                                None => (rest, None),
+                            };
+                            let (id_part, path_part) = match main_part.find('/') {
+                                Some(idx) => (&main_part[..idx], &main_part[idx..]),
+                                None => (main_part, "/"),
+                            };
+                            if let Some((p, h)) = id_part.split_once('@') {
+                                if petname.is_empty() { petname = p.to_string(); }
+                                if hash.is_empty() { hash = h.to_string(); }
+                            } else if hash.is_empty() {
+                                hash = id_part.to_string();
+                            }
+                            if !path_part.is_empty() && cpath == "/" {
+                                cpath = path_part.to_string();
+                            }
+                            if let Some(q) = query_part {
+                                if let Some(l) = parse_query_param(q, "label") { if label.is_empty() { label = l; } }
+                                if let Some(n) = parse_query_param(q, "notes") { if notes.is_empty() { notes = n; } }
+                                if let Some(s) = parse_query_param(q, "scheme") { scheme = s; }
+                            }
+                        }
+                    }
+                    let entry = contacts::Contact { petname, label, hash, scheme, path: cpath, notes, updated_at: 0 };
+                    match contacts::upsert_contact(entry) {
+                        Ok(list) => responder.respond(json_response(StatusCode::OK, serde_json::json!({ "ok": true, "contacts": list }).to_string())),
+                        Err(err) => responder.respond(json_response(StatusCode::BAD_REQUEST, serde_json::json!({ "ok": false, "error": err }).to_string())),
+                    }
+                    return;
+                }
+                if method.eq_ignore_ascii_case("DELETE") {
+                    let petname = path.split_once('?').and_then(|(_, q)| parse_query_param(q, "petname")).unwrap_or_default();
+                    match contacts::delete_contact(&petname) {
+                        Ok(list) => responder.respond(json_response(StatusCode::OK, serde_json::json!({ "ok": true, "contacts": list }).to_string())),
+                        Err(err) => responder.respond(json_response(StatusCode::BAD_REQUEST, serde_json::json!({ "ok": false, "error": err }).to_string())),
+                    }
+                    return;
+                }
+            }
             if path == "/api/ai-chat" && method.eq_ignore_ascii_case("POST") {
                 let t0 = Instant::now();
                 let req_json: serde_json::Value = match serde_json::from_slice(&body) {
@@ -583,9 +652,12 @@ fn spawn_mesh_handler(
             return;
         }
 
+        // Zero-DNS Local Sovereign Petname Resolution (`bifrost://forge/` -> 32-hex hash)
+        let resolved_host = contacts::resolve_host_to_hash(&host);
+
         // Live In-Process Reticulum Fetch -> 0-Port Ghost Linux Server
         match client
-            .request(&host, &method, &path, hdrs, body, Duration::from_secs(25))
+            .request(&resolved_host, &method, &path, hdrs, body, Duration::from_secs(25))
             .await
         {
             Ok(resp) => {
@@ -731,7 +803,8 @@ fn main() -> Result<()> {
             let uri = request.uri().to_string();
             let method = request.method().as_str().to_string();
             let body = request.body().clone();
-            let (host, path) = parse_custom_uri(&uri, "ironpass");
+            let (raw_host, path) = parse_custom_uri(&uri, "ironpass");
+            let host = contacts::resolve_host_to_hash(&raw_host);
             let client = Arc::clone(&client_ironpass);
 
             rt_ironpass.spawn(async move {

@@ -183,6 +183,7 @@ pub const HOME_HTML: &str = r##"<!DOCTYPE html>
     <div class="top-right">
       <button type="button" class="top-btn mono" id="think-toggle" onclick="toggleThinking()">🧠 THINK: OFF</button>
       <a class="top-btn mono" href="bifrost://home/qr-sheet">🖨️ QR TAGS</a>
+      <button type="button" class="top-btn mono" id="contacts-btn" onclick="openContacts()" title="Local Sovereign Contact Book (~/.config/bifrost/contacts.json · 0 DNS)">📒 CONTACTS (0)</button>
       <button type="button" class="top-btn mono" id="nodes-btn" onclick="openDrawer()">📡 NODES (0)</button>
     </div>
   </header>
@@ -257,20 +258,66 @@ pub const HOME_HTML: &str = r##"<!DOCTYPE html>
     </aside>
   </div>
 
+  <div class="drawer-backdrop" id="contacts-backdrop" onclick="if(event.target===this) closeContacts()">
+    <aside class="drawer">
+      <div class="drawer-head">
+        <h2 class="mono" style="font-size:15px;">📒 SOVEREIGN CONTACT BOOK</h2>
+        <button type="button" class="top-btn mono" onclick="closeContacts()">✕ CLOSE</button>
+      </div>
+      <div class="mono" style="font-size:11px; color:var(--muted);">
+        Zero-DNS local petnames stored on this device (<code>~/.config/bifrost/contacts.json</code>). Type <code>bifrost://&lt;petname&gt;/</code> or paste a <code>bifrost-card://</code> invite.
+      </div>
+      <div class="peer-card" style="border-color:rgba(132,204,22,0.38);">
+        <div class="mono" style="font-size:11px; font-weight:800; color:var(--lime);">＋ ADD CONTACT OR PASTE INVITE CARD</div>
+        <input id="cb-card" class="mono" placeholder="Paste bifrost-card://... or bifrost://<hash>/" oninput="parseInviteCardInput()" style="background:rgba(2,8,5,0.92);border:1px solid var(--border);color:#fff;border-radius:8px;padding:7px 9px;font-size:11px;outline:none;" />
+        <div style="display:grid; grid-template-columns:1fr 1.4fr; gap:7px;">
+          <input id="cb-petname" class="mono" placeholder="petname (e.g. forge)" style="background:rgba(2,8,5,0.92);border:1px solid var(--border);color:#fff;border-radius:8px;padding:7px 9px;font-size:11.5px;outline:none;" />
+          <input id="cb-label" placeholder="Friendly label" style="background:rgba(2,8,5,0.92);border:1px solid var(--border);color:#fff;border-radius:8px;padding:7px 9px;font-size:11.5px;outline:none;" />
+        </div>
+        <input id="cb-hash" class="mono" placeholder="32-hex 128-bit Reticulum destination hash" style="background:rgba(2,8,5,0.92);border:1px solid var(--border);color:#bae6fd;border-radius:8px;padding:7px 9px;font-size:11px;outline:none;" />
+        <input id="cb-notes" placeholder="Notes (optional)" style="background:rgba(2,8,5,0.92);border:1px solid var(--border);color:#fff;border-radius:8px;padding:7px 9px;font-size:11px;outline:none;" />
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+          <span id="cb-msg" class="mono" style="font-size:10.5px; color:var(--muted);">Ready.</span>
+          <button type="button" class="btn-sm mono" onclick="saveContact()">💾 SAVE CONTACT</button>
+        </div>
+      </div>
+      <div id="contacts-list" style="display:flex; flex-direction:column; gap:10px;"></div>
+    </aside>
+  </div>
+
 <script>
 const conversation = [];
 let isBusy = false;
 let enableThinking = false;
 let llmHash = null;
 let llmModel = 'qwen3-4b-npu';
+let savedContacts = [];
+let latestPeers = [];
+
+function findContactByPetname(raw) {
+  const key = (raw || '').trim().toLowerCase().replace(/^@/, '');
+  return savedContacts.find(c => c.petname === key) || null;
+}
+function findContactByHash(hash) {
+  const h = (hash || '').trim().toLowerCase();
+  return savedContacts.find(c => c.hash === h) || null;
+}
 
 function detectGhostUri(raw) {
   const v = (raw || '').trim();
   if (!v) return null;
+  if (/^bifrost-card:\/\//i.test(v)) return v;
   const hybrid = v.match(/#ip=([^\s]+)/i);
   if (hybrid && hybrid[1]) return 'ironpass://' + hybrid[1].replace(/^\/+/, '');
   if (/^(bifrost|citadel|ironpass):\/\//i.test(v)) return v;
   if (/^[0-9a-f]{32}(\/.*)?$/i.test(v)) return 'bifrost://' + (v.includes('/') ? v : v + '/');
+  const [head, ...rest] = v.split('/');
+  const matched = findContactByPetname(head);
+  if (matched) {
+    const scheme = matched.scheme || 'bifrost';
+    const sub = rest.length ? '/' + rest.join('/') : (matched.path || '/');
+    return `${scheme}://${matched.petname}${sub}`;
+  }
   return null;
 }
 
@@ -279,10 +326,12 @@ function updateOmniboxMode() {
   const form = document.getElementById('omnibox-form');
   const icon = document.getElementById('omni-icon');
   const btn = document.getElementById('omni-submit');
-  const isUri = Boolean(detectGhostUri(input.value));
+  const detected = detectGhostUri(input.value);
+  const isCard = Boolean(detected && detected.startsWith('bifrost-card://'));
+  const isUri = Boolean(detected);
   form.classList.toggle('mode-uri', isUri);
-  icon.textContent = isUri ? '🔒' : '✦';
-  if (!isBusy) btn.textContent = isUri ? 'OPEN URI →' : 'ASK AI ↵';
+  icon.textContent = isCard ? '📒' : (isUri ? '🔒' : '✦');
+  if (!isBusy) btn.textContent = isCard ? 'IMPORT CARD →' : (isUri ? 'OPEN URI →' : 'ASK AI ↵');
 }
 
 function toggleThinking() {
@@ -329,6 +378,14 @@ async function handleOmnibox(e) {
   const raw = input.value.trim();
   if (!raw || isBusy) return;
   const uri = detectGhostUri(raw);
+  if (uri && uri.startsWith('bifrost-card://')) {
+    input.value = '';
+    updateOmniboxMode();
+    openContacts();
+    document.getElementById('cb-card').value = uri;
+    parseInviteCardInput();
+    return;
+  }
   if (uri) { window.location.href = uri; return; }
 
   input.value = '';
@@ -357,6 +414,139 @@ async function handleOmnibox(e) {
 
 function openDrawer() { document.getElementById('drawer-backdrop').classList.add('open'); refreshPeers(); }
 function closeDrawer() { document.getElementById('drawer-backdrop').classList.remove('open'); }
+function openContacts(prefillHash = '', prefillLabel = '') {
+  document.getElementById('contacts-backdrop').classList.add('open');
+  if (prefillHash) {
+    document.getElementById('cb-hash').value = prefillHash;
+    const existing = findContactByHash(prefillHash);
+    if (existing) {
+      document.getElementById('cb-petname').value = existing.petname || '';
+      document.getElementById('cb-label').value = existing.label || '';
+      document.getElementById('cb-notes').value = existing.notes || '';
+    } else {
+      document.getElementById('cb-label').value = prefillLabel || '';
+      const slug = (prefillLabel || prefillHash.slice(0, 8)).toLowerCase().replace(/[^a-z0-9-_]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 20);
+      document.getElementById('cb-petname').value = slug;
+      document.getElementById('cb-notes').value = '';
+    }
+    document.getElementById('cb-msg').textContent = 'Review petname & click Save.';
+  }
+  refreshContacts();
+}
+function closeContacts() { document.getElementById('contacts-backdrop').classList.remove('open'); }
+function parseInviteCardInput() {
+  const raw = (document.getElementById('cb-card').value || '').trim();
+  if (!raw) return;
+  if (raw.startsWith('bifrost-card://')) {
+    const body = raw.slice('bifrost-card://'.length);
+    const [mainPart, qPart] = body.split('?');
+    const idPart = mainPart.split('/')[0] || '';
+    if (idPart.includes('@')) {
+      const [p, h] = idPart.split('@');
+      if (p) document.getElementById('cb-petname').value = p;
+      if (h) document.getElementById('cb-hash').value = h;
+    } else if (/^[0-9a-f]{32}$/i.test(idPart)) {
+      document.getElementById('cb-hash').value = idPart.toLowerCase();
+    }
+    if (qPart) {
+      const params = new URLSearchParams(qPart);
+      if (params.get('label')) document.getElementById('cb-label').value = params.get('label');
+      if (params.get('notes')) document.getElementById('cb-notes').value = params.get('notes');
+    }
+    document.getElementById('cb-msg').textContent = 'Invite card parsed — click Save!';
+    return;
+  }
+  const m = raw.match(/([0-9a-f]{32})/i);
+  if (m) {
+    document.getElementById('cb-hash').value = m[1].toLowerCase();
+    document.getElementById('cb-msg').textContent = '32-hex hash extracted — enter a petname & click Save.';
+  }
+}
+async function refreshContacts() {
+  try {
+    const r = await fetch('bifrost://home/api/contacts');
+    const d = await r.json();
+    savedContacts = d.contacts || [];
+    const btn = document.getElementById('contacts-btn');
+    if (btn) btn.textContent = `📒 CONTACTS (${savedContacts.length})`;
+    renderContactsList();
+  } catch (e) {}
+}
+function makeInviteCard(c) {
+  const params = new URLSearchParams();
+  if (c.label) params.set('label', c.label);
+  if (c.notes) params.set('notes', c.notes);
+  if (c.scheme && c.scheme !== 'bifrost') params.set('scheme', c.scheme);
+  const pathPart = c.path && c.path !== '/' ? c.path : '';
+  return `bifrost-card://${c.petname}@${c.hash}${pathPart}?${params.toString()}`;
+}
+async function copyInviteCard(petname) {
+  const c = findContactByPetname(petname);
+  if (!c) return;
+  const card = makeInviteCard(c);
+  try { await navigator.clipboard.writeText(card); document.getElementById('cb-msg').textContent = `Copied invite card for @${c.petname}!`; }
+  catch { prompt('Copy BIFROST Contact Invite Card:', card); }
+}
+async function saveContact() {
+  const msg = document.getElementById('cb-msg');
+  const payload = {
+    card: (document.getElementById('cb-card').value || '').trim(),
+    petname: (document.getElementById('cb-petname').value || '').trim(),
+    label: (document.getElementById('cb-label').value || '').trim(),
+    hash: (document.getElementById('cb-hash').value || '').trim(),
+    notes: (document.getElementById('cb-notes').value || '').trim(),
+  };
+  try {
+    const r = await fetch('bifrost://home/api/contacts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const d = await r.json();
+    if (!d.ok) { msg.style.color = 'var(--danger)'; msg.textContent = d.error || 'Could not save contact.'; return; }
+    savedContacts = d.contacts || [];
+    document.getElementById('contacts-btn').textContent = `📒 CONTACTS (${savedContacts.length})`;
+    ['cb-card','cb-petname','cb-label','cb-hash','cb-notes'].forEach(id => document.getElementById(id).value = '');
+    msg.style.color = 'var(--lime)';
+    msg.textContent = 'Saved locally (~/.config/bifrost/contacts.json).';
+    renderContactsList();
+    refreshPeers();
+  } catch (e) { msg.style.color = 'var(--danger)'; msg.textContent = `Save error: ${e}`; }
+}
+async function deleteContact(petname) {
+  const r = await fetch(`bifrost://home/api/contacts?petname=${encodeURIComponent(petname)}`, { method: 'DELETE' });
+  const d = await r.json();
+  if (d.ok) {
+    savedContacts = d.contacts || [];
+    document.getElementById('contacts-btn').textContent = `📒 CONTACTS (${savedContacts.length})`;
+    renderContactsList();
+    refreshPeers();
+  }
+}
+function renderContactsList() {
+  const el = document.getElementById('contacts-list');
+  if (!el) return;
+  if (!savedContacts.length) {
+    el.innerHTML = `<div class="peer-card"><div class="mono" style="font-size:12px;color:var(--muted);">No saved contacts yet. Paste an invite card above or click "+ SAVE CONTACT" on any peer in NODES.</div></div>`;
+    return;
+  }
+  const activeHashes = new Set((latestPeers || []).filter(p => p.active).map(p => p.hash));
+  el.innerHTML = savedContacts.map(c => {
+    const online = activeHashes.has(c.hash);
+    const petUri = `${c.scheme || 'bifrost'}://${c.petname}${c.path || '/'}`;
+    return `
+      <div class="peer-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+          <h3 style="font-size:14px;">${escHtml(c.label || c.petname)}</h3>
+          <span class="status-chip ${online ? 'online' : 'waiting'} mono" style="padding:3px 8px;font-size:10px;">${online ? 'ONLINE' : 'SAVED'}</span>
+        </div>
+        <div class="hash-box mono" style="color:#d9f99d;">${escHtml(petUri)} → ${escHtml(c.hash.slice(0, 12))}…${escHtml(c.hash.slice(-6))}</div>
+        ${c.notes ? `<div style="font-size:11px; color:var(--muted);">${escHtml(c.notes)}</div>` : ''}
+        <div class="card-actions">
+          <button class="btn-sm mono" onclick="window.location.href='${escHtml(petUri)}'">OPEN ${escHtml('@' + c.petname)}</button>
+          <button class="btn-sm mono" onclick="copyInviteCard('${escHtml(c.petname)}')">📋 COPY CARD</button>
+          <button class="btn-sm amber mono" onclick="deleteContact('${escHtml(c.petname)}')">✕</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
 
 async function refreshPeers() {
   try {
@@ -365,6 +555,8 @@ async function refreshPeers() {
     llmHash = d.llm_hash || null;
     if (d.llm_model) llmModel = d.llm_model;
     const peers = d.peers || [];
+    latestPeers = peers;
+    renderContactsList();
     const bookmarks = d.bookmarks || [];
 
     document.getElementById('nodes-btn').textContent = `📡 NODES (${peers.length})`;
@@ -397,10 +589,14 @@ async function refreshPeers() {
       return;
     }
 
-    list.innerHTML = peers.map(p => `
+    list.innerHTML = peers.map(p => {
+      const saved = findContactByHash(p.hash);
+      const displayName = saved ? `${saved.label} (@${saved.petname})` : p.alias;
+      const target = saved ? escHtml(saved.petname) : p.hash;
+      return `
       <div class="peer-card">
         <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
-          <h3 style="font-size:14px;">${escHtml(p.alias)}</h3>
+          <h3 style="font-size:14px;">${escHtml(displayName)}</h3>
           <span class="status-chip ${p.active ? 'online' : 'waiting'} mono" style="padding:3px 8px;font-size:10px;">${p.active ? 'X25519 LIVE' : 'LINKING'}</span>
         </div>
         <div class="hash-box mono">bifrost://${p.hash}/</div>
@@ -410,16 +606,19 @@ async function refreshPeers() {
           <span>Chunks: ${p.chunks_rx}</span>
         </div>
         <div class="card-actions">
-          <button class="btn-sm mono" onclick="window.location.href='bifrost://${p.hash}/'">OPEN GHOST SITE →</button>
-          <button class="btn-sm amber mono" onclick="window.location.href='ironpass://${p.hash}/dpp/demo-01'">OPEN DEMO DPP + LEDGER</button>
+          <button class="btn-sm mono" onclick="window.location.href='bifrost://${target}/'">OPEN GHOST SITE →</button>
+          <button class="btn-sm amber mono" onclick="window.location.href='ironpass://${target}/dpp/demo-01'">OPEN DEMO DPP + LEDGER</button>
+          <button class="btn-sm mono" onclick="closeDrawer(); openContacts('${escHtml(p.hash)}', '${escHtml(p.alias)}')">${saved ? '✎ EDIT CONTACT' : '＋ SAVE CONTACT'}</button>
         </div>
       </div>
-    `).join('');
+    `;
+    }).join('');
   } catch (err) {
     document.getElementById('peers-list').innerHTML = `<div class="peer-card"><div class="mono" style="font-size:12px;color:var(--danger);">Error: ${escHtml(err)}</div></div>`;
   }
 }
 
+refreshContacts();
 refreshPeers();
 setInterval(refreshPeers, 3000);
 </script>
