@@ -8,11 +8,11 @@
   <em>“Verifiable Credentials protect the passport. Chrome leaks the mission.”</em>
 </p>
 <p align="center">
-  <code>v0.3.1-preview (Experimental Developer Preview)</code> &nbsp;·&nbsp; <code>bifrost://</code> &nbsp;·&nbsp; <code>ironpass://</code> &nbsp;·&nbsp; <strong>0 Local HTTP Ports</strong> &nbsp;·&nbsp; <strong>IFAC + Ed25519 Mutual Auth</strong>
+  <code>v0.3.2-preview (Experimental Developer Preview)</code> &nbsp;·&nbsp; <code>bifrost://</code> &nbsp;·&nbsp; <code>ironpass://</code> &nbsp;·&nbsp; <strong>0 Local HTTP Ports</strong> &nbsp;·&nbsp; <strong>IFAC + Ed25519 Mutual Auth</strong>
 </p>
 
 > [!NOTE]
-> **Scope & Status (`v0.3.1-preview` — Experimental Developer Preview):**
+> **Scope & Status (`v0.3.2-preview` — Experimental Developer Preview):**
 > **BIFROST** is an **application-layer HTTP/DPP Ghost Browser** built on top of [`citadel-rns-rs`](https://github.com/whattio/citadel-rns-rs) and the MIT Rust `Reticulum-rs` library. It is **not** a full Reticulum protocol implementation and does not replace Mark Qvist's authoritative Python Reference Implementation ([markqvist/Reticulum](https://github.com/markqvist/Reticulum)). Full wire-level interoperability testing against the official Python `RNS` reference node (and optional support for community-recognized **Quad4 `Reticulum-Go`**) is on the active engineering roadmap. BIFROST is built strictly for **EU ESPR / CIRPASS-2 Digital Product Passports, critical-infrastructure resilience, and defensive sovereign privacy** (non-weaponized).
 
 ---

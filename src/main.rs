@@ -158,6 +158,49 @@ fn load_user_bookmarks() -> Vec<Bookmark> {
     Vec::new()
 }
 
+fn relays_file_path() -> PathBuf {
+    let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+    PathBuf::from(home).join(".config").join("bifrost").join("peers.json")
+}
+
+fn load_saved_relays() -> Vec<String> {
+    let p = relays_file_path();
+    let Ok(raw) = std::fs::read_to_string(&p) else {
+        return Vec::new();
+    };
+    if let Ok(list) = serde_json::from_str::<Vec<String>>(&raw) {
+        return list
+            .into_iter()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .collect();
+    }
+    Vec::new()
+}
+
+fn save_relays(relays: &[String]) {
+    let p = relays_file_path();
+    if let Some(parent) = p.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let mut dedup: Vec<String> = Vec::new();
+    for r in relays {
+        let t = r.trim();
+        if !t.is_empty() && !dedup.iter().any(|x| x == t) {
+            dedup.push(t.to_string());
+        }
+    }
+    if let Ok(json) = serde_json::to_string_pretty(&dedup) {
+        if std::fs::write(&p, json).is_ok() {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let _ = std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o600));
+            }
+        }
+    }
+}
+
 fn split_think_blocks(raw: &str) -> (String, Option<String>) {
     if let Some(start) = raw.find("<think>") {
         if let Some(end_rel) = raw[start + 7..].find("</think>") {
@@ -471,6 +514,7 @@ fn spawn_mesh_handler(
                         })
                         .map(|p| p.hash.clone())
                 });
+                let relays = client.configured_peers().await;
                 let payload = serde_json::json!({
                     "ok": true,
                     "version": env!("BIFROST_VERSION"),
@@ -481,6 +525,7 @@ fn spawn_mesh_handler(
                     "ifac_fingerprint": client.ifac_fingerprint(),
                     "identity": client.identity_name(),
                     "rns_listen": ctx.listen_label,
+                    "relays": relays,
                     "allow_hashes": ctx.allow_label,
                     "llm_hash": detected_llm,
                     "llm_model": ctx.llm_model,
@@ -488,6 +533,41 @@ fn spawn_mesh_handler(
                     "peers": peers,
                 });
                 responder.respond(json_response(StatusCode::OK, payload.to_string()));
+                return;
+            }
+            if path == "/api/relays/add" || path.starts_with("/api/relays/add?") {
+                let addr = path
+                    .split_once('?')
+                    .and_then(|(_, q)| parse_query_param(q, "addr"))
+                    .unwrap_or_default()
+                    .trim()
+                    .to_string();
+                if addr.is_empty() || !addr.contains(':') {
+                    let out = serde_json::json!({ "ok": false, "error": "Enter relay as host:port (e.g. 192.168.1.50:14290)" });
+                    responder.respond(json_response(StatusCode::BAD_REQUEST, out.to_string()));
+                    return;
+                }
+                client.connect_peer(&addr).await;
+                let mut saved = load_saved_relays();
+                if !saved.iter().any(|x| x == &addr) {
+                    saved.push(addr.clone());
+                    save_relays(&saved);
+                }
+                let relays = client.configured_peers().await;
+                responder.respond(json_response(StatusCode::OK, serde_json::json!({ "ok": true, "relays": relays }).to_string()));
+                return;
+            }
+            if path == "/api/relays/remove" || path.starts_with("/api/relays/remove?") {
+                let addr = path
+                    .split_once('?')
+                    .and_then(|(_, q)| parse_query_param(q, "addr"))
+                    .unwrap_or_default()
+                    .trim()
+                    .to_string();
+                let mut saved = load_saved_relays();
+                saved.retain(|x| x != &addr);
+                save_relays(&saved);
+                responder.respond(json_response(StatusCode::OK, serde_json::json!({ "ok": true, "relays": saved }).to_string()));
                 return;
             }
             if path == "/api/contacts/save" || path.starts_with("/api/contacts/save?") {
@@ -867,10 +947,21 @@ fn spawn_mesh_handler(
                 responder.respond(builder.body(resp.body).unwrap());
             }
             Err(e) => {
+                let relays = client.configured_peers().await;
+                let relays_txt = if relays.is_empty() {
+                    "none (open 📡 NODES on bifrost://home/ to add a relay)".to_string()
+                } else {
+                    relays.join(", ")
+                };
                 let err_html = format!(
-                    "<html><body style='background:#020503;color:#fca5a5;font-family:monospace;padding:32px'>\
-                     <h2>BIFROST // RETICULUM LINK ERROR</h2><p>{e}</p>\
-                     <p><a style='color:#84cc16' href='bifrost://home/'>← Return to bifrost://home/</a></p></body></html>"
+                    "<html><body style='background:#020503;color:#fca5a5;font-family:ui-monospace,monospace;padding:32px;max-width:740px;margin:0 auto;'>\
+                     <h2>BIFROST // RETICULUM LINK ERROR</h2>\
+                     <p style='color:#fecaca;'>{e}</p>\
+                     <p style='color:#94a3b8;font-size:12px;'>Connected relays: <code style='color:#7dd3fc;'>{relays_txt}</code></p>\
+                     <p style='display:flex;gap:12px;margin-top:20px;'>\
+                       <button onclick='window.location.reload()' style='background:rgba(132,204,22,0.18);border:1px solid #84cc16;color:#bef264;padding:8px 14px;border-radius:8px;cursor:pointer;font-family:inherit;font-weight:800;'>↻ RETRY LINK</button>\
+                       <a style='color:#7dd3fc;padding:8px 14px;border:1px solid rgba(56,189,248,0.45);border-radius:8px;text-decoration:none;' href='bifrost://home/'>← Home &amp; Relays</a>\
+                     </p></body></html>"
                 );
                 responder.respond(html_response(StatusCode::BAD_GATEWAY, err_html));
             }
@@ -918,10 +1009,24 @@ fn main() -> Result<()> {
         Some(args.rns_listen.clone())
     };
 
+    // Merge CLI --rns-peer values with saved relays (~/.config/bifrost/peers.json) and persist new CLI relays
+    let mut merged_peers = load_saved_relays();
+    let mut added_new_cli_peer = false;
+    for p in &args.rns_peers {
+        let t = p.trim();
+        if !t.is_empty() && !merged_peers.iter().any(|x| x == t) {
+            merged_peers.push(t.to_string());
+            added_new_cli_peer = true;
+        }
+    }
+    if added_new_cli_peer {
+        save_relays(&merged_peers);
+    }
+
     let rns_client: Arc<CitadelRnsClient> = rt.block_on(CitadelRnsClient::start_with_security(
         &args.identity_name,
         rns_listen_opt.clone(),
-        args.rns_peers.clone(),
+        merged_peers,
         args.allow_hashes.clone(),
         ifac,
         client_identity,

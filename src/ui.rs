@@ -256,6 +256,15 @@ pub const HOME_HTML: &str = r##"<!DOCTYPE html>
         <button type="button" class="top-btn mono" onclick="closeDrawer()">✕ CLOSE</button>
       </div>
       <div class="mono" style="font-size:11px; color:var(--muted);" id="listen-info">Scanning Reticulum announces...</div>
+      <div class="peer-card" style="border-color:rgba(56,189,248,0.38);">
+        <div class="mono" style="font-size:11px;font-weight:800;color:#7dd3fc;">🌐 RETICULUM RELAYS (SAVED TO ~/.config/bifrost/peers.json)</div>
+        <div id="relays-list" class="mono" style="font-size:11px;color:var(--muted);">None configured yet.</div>
+        <div style="display:flex;gap:6px;">
+          <input id="relay-addr-input" class="mono" placeholder="host:14290 (e.g. relay.example:14290)" style="flex:1;background:rgba(2,8,5,0.92);border:1px solid var(--border);color:#fff;border-radius:8px;padding:6px 9px;font-size:11px;outline:none;" />
+          <button type="button" class="btn-sm mono" onclick="addRelayPeer()">＋ CONNECT</button>
+        </div>
+        <div id="relay-msg" class="mono" style="font-size:10.5px;color:var(--muted);"></div>
+      </div>
       <div id="peers-list" style="display:flex; flex-direction:column; gap:10px;"></div>
     </aside>
   </div>
@@ -616,9 +625,36 @@ function renderContactsList() {
   }).join('');
 }
 
+async function addRelayPeer() {
+  const inp = document.getElementById('relay-addr-input');
+  const msg = document.getElementById('relay-msg');
+  const addr = (inp.value || '').trim();
+  if (!addr) return;
+  msg.style.color = 'var(--muted)';
+  msg.textContent = `Dialing ${addr}...`;
+  try {
+    const r = await fetch(`bifrost://home/api/relays/add?addr=${encodeURIComponent(addr)}`, { cache: 'no-store' });
+    const d = await r.json();
+    if (!d.ok) { msg.style.color = 'var(--danger)'; msg.textContent = d.error || 'Could not add relay.'; return; }
+    inp.value = '';
+    msg.style.color = 'var(--lime)';
+    msg.textContent = `Connected & saved ${addr} — waiting for peer announces (~2s)...`;
+    refreshPeers();
+  } catch (e) { msg.style.color = 'var(--danger)'; msg.textContent = `Relay error: ${e}`; }
+}
+
+async function removeRelayPeer(addr) {
+  try {
+    await fetch(`bifrost://home/api/relays/remove?addr=${encodeURIComponent(addr)}`, { cache: 'no-store' });
+    const msg = document.getElementById('relay-msg');
+    if (msg) { msg.style.color = 'var(--amber)'; msg.textContent = `Removed ${addr} from saved relays (takes effect next launch).`; }
+    refreshPeers();
+  } catch (_) {}
+}
+
 async function refreshPeers() {
   try {
-    const r = await fetch('bifrost://home/api/peers');
+    const r = await fetch('bifrost://home/api/peers', { cache: 'no-store' });
     const d = await r.json();
     llmHash = d.llm_hash || null;
     if (d.llm_model) llmModel = d.llm_model;
@@ -626,6 +662,13 @@ async function refreshPeers() {
       myClientId = d.client_id;
       const cidEl = document.getElementById('my-client-id');
       if (cidEl) cidEl.textContent = d.client_id;
+    }
+    const relaysEl = document.getElementById('relays-list');
+    if (relaysEl) {
+      const relays = d.relays || [];
+      relaysEl.innerHTML = relays.length
+        ? relays.map(x => `<span style="display:inline-flex;align-items:center;gap:6px;margin:2px 6px 2px 0;padding:2px 8px;border-radius:999px;background:rgba(56,189,248,0.12);border:1px solid rgba(56,189,248,0.38);color:#bae6fd;">${escHtml(x)} <button type="button" onclick="removeRelayPeer('${escHtml(x)}')" style="background:none;border:none;color:#fca5a5;cursor:pointer;font-size:10px;padding:0;">✕</button></span>`).join('')
+        : 'No outbound relays configured. Add your relay host:port below.';
     }
     const ifacEl = document.getElementById('ifac-chip');
     if (ifacEl) {

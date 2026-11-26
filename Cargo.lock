@@ -205,7 +205,7 @@ checksum = "2af50177e190e07a26ab74f8b1efbfe2ef87da2116221318cb1c2e82baf7de06"
 
 [[package]]
 name = "bifrost-ghost-browser"
-version = "0.3.1-preview"
+version = "0.3.2-preview"
 dependencies = [
  "anyhow",
  "citadel-rns-rs",
@@ -393,7 +393,7 @@ dependencies = [
 [[package]]
 name = "citadel-rns-rs"
 version = "0.5.0"
-source = "git+https://github.com/whattio/citadel-rns-rs.git?branch=main#35901b764c533da154b425c6c7346c12e2421400"
+source = "git+https://github.com/whattio/citadel-rns-rs.git?branch=main#21962c3aa11dab4fc2268ced2121e7e3ef7e56ee"
 dependencies = [
  "anyhow",
  "axum",
