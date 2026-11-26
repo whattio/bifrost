@@ -304,10 +304,39 @@ let llmModel = 'qwen3-4b-npu';
 let savedContacts = [];
 let latestPeers = [];
 let myClientId = '';
+async function copyTextSafe(text) {
+  if (!text) return false;
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch (_) {}
+  try {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    const ok = document.execCommand('copy');
+    ta.remove();
+    return Boolean(ok);
+  } catch (_) {
+    return false;
+  }
+}
+
 async function copyMyClientId() {
   if (!myClientId) return;
-  try { await navigator.clipboard.writeText(myClientId); const m = document.getElementById('cb-msg'); if (m) { m.style.color = 'var(--lime)'; m.textContent = 'Copied your Ed25519 Device ID!'; } }
-  catch { prompt('Your Ed25519 Device Client ID:', myClientId); }
+  const m = document.getElementById('cb-msg');
+  const ok = await copyTextSafe(myClientId);
+  if (m) {
+    m.style.color = 'var(--lime)';
+    m.textContent = ok ? 'Copied your Ed25519 Device ID!' : `Device ID: ${myClientId}`;
+  }
 }
 
 function findContactByPetname(raw) {
@@ -411,11 +440,15 @@ async function handleOmnibox(e) {
   document.getElementById('omni-submit').disabled = true;
 
   try {
-    const r = await fetch('bifrost://home/api/ai-chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: llmModel, enable_thinking: enableThinking, messages: conversation.slice(-12) }),
-    });
+    const bodyStr = JSON.stringify({ model: llmModel, enable_thinking: enableThinking, messages: conversation.slice(-12) });
+    const encoded = encodeURIComponent(bodyStr);
+    const r = encoded.length <= 6000
+      ? await fetch(`bifrost://home/api/ai-chat?payload=${encoded}`, { cache: 'no-store' })
+      : await fetch('bifrost://home/api/ai-chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+          body: bodyStr,
+        });
     const d = await r.json();
     if (!d.ok) appendMessage('error', d.error || 'Local AI peer unavailable.');
     else { conversation.push({ role: 'assistant', content: d.reply || '' }); appendMessage('assistant', d.reply || '', d); }
@@ -480,7 +513,7 @@ function parseInviteCardInput() {
 }
 async function refreshContacts() {
   try {
-    const r = await fetch('bifrost://home/api/contacts');
+    const r = await fetch('bifrost://home/api/contacts', { cache: 'no-store' });
     const d = await r.json();
     savedContacts = d.contacts || [];
     const btn = document.getElementById('contacts-btn');
@@ -500,39 +533,58 @@ async function copyInviteCard(petname) {
   const c = findContactByPetname(petname);
   if (!c) return;
   const card = makeInviteCard(c);
-  try { await navigator.clipboard.writeText(card); document.getElementById('cb-msg').textContent = `Copied invite card for @${c.petname}!`; }
-  catch { prompt('Copy BIFROST Contact Invite Card:', card); }
+  const msg = document.getElementById('cb-msg');
+  const ok = await copyTextSafe(card);
+  if (msg) {
+    msg.style.color = 'var(--lime)';
+    msg.textContent = ok ? `Copied invite card for @${c.petname}!` : card;
+  }
 }
 async function saveContact() {
   const msg = document.getElementById('cb-msg');
-  const payload = {
-    card: (document.getElementById('cb-card').value || '').trim(),
-    petname: (document.getElementById('cb-petname').value || '').trim(),
-    label: (document.getElementById('cb-label').value || '').trim(),
-    hash: (document.getElementById('cb-hash').value || '').trim(),
-    notes: (document.getElementById('cb-notes').value || '').trim(),
-  };
+  if ((document.getElementById('cb-card').value || '').trim() && !(document.getElementById('cb-hash').value || '').trim()) {
+    parseInviteCardInput();
+  }
+  const params = new URLSearchParams();
+  const card = (document.getElementById('cb-card').value || '').trim();
+  const petname = (document.getElementById('cb-petname').value || '').trim();
+  const label = (document.getElementById('cb-label').value || '').trim();
+  const hash = (document.getElementById('cb-hash').value || '').trim();
+  const notes = (document.getElementById('cb-notes').value || '').trim();
+  if (card) params.set('card', card);
+  if (petname) params.set('petname', petname);
+  if (label) params.set('label', label);
+  if (hash) params.set('hash', hash);
+  if (notes) params.set('notes', notes);
+  msg.style.color = 'var(--muted)';
+  msg.textContent = 'Saving...';
   try {
-    const r = await fetch('bifrost://home/api/contacts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    // Use simple GET query-params so macOS WKWebView custom-scheme handlers never strip POST bodies or block CORS preflight
+    const r = await fetch(`bifrost://home/api/contacts/save?${params.toString()}`, { cache: 'no-store' });
     const d = await r.json();
     if (!d.ok) { msg.style.color = 'var(--danger)'; msg.textContent = d.error || 'Could not save contact.'; return; }
     savedContacts = d.contacts || [];
     document.getElementById('contacts-btn').textContent = `📒 CONTACTS (${savedContacts.length})`;
     ['cb-card','cb-petname','cb-label','cb-hash','cb-notes'].forEach(id => document.getElementById(id).value = '');
     msg.style.color = 'var(--lime)';
-    msg.textContent = 'Saved locally (~/.config/bifrost/contacts.json).';
+    msg.textContent = `Saved locally (${savedContacts.length} contacts in ~/.config/bifrost/contacts.json).`;
     renderContactsList();
     refreshPeers();
   } catch (e) { msg.style.color = 'var(--danger)'; msg.textContent = `Save error: ${e}`; }
 }
 async function deleteContact(petname) {
-  const r = await fetch(`bifrost://home/api/contacts?petname=${encodeURIComponent(petname)}`, { method: 'DELETE' });
-  const d = await r.json();
-  if (d.ok) {
-    savedContacts = d.contacts || [];
-    document.getElementById('contacts-btn').textContent = `📒 CONTACTS (${savedContacts.length})`;
-    renderContactsList();
-    refreshPeers();
+  try {
+    const r = await fetch(`bifrost://home/api/contacts/delete?petname=${encodeURIComponent(petname)}`, { cache: 'no-store' });
+    const d = await r.json();
+    if (d.ok) {
+      savedContacts = d.contacts || [];
+      document.getElementById('contacts-btn').textContent = `📒 CONTACTS (${savedContacts.length})`;
+      renderContactsList();
+      refreshPeers();
+    }
+  } catch (e) {
+    const msg = document.getElementById('cb-msg');
+    if (msg) { msg.style.color = 'var(--danger)'; msg.textContent = `Delete error: ${e}`; }
   }
 }
 function renderContactsList() {

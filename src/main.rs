@@ -257,8 +257,145 @@ fn json_response(status: StatusCode, body: String) -> Response<Vec<u8>> {
         .status(status)
         .header(header::CONTENT_TYPE, "application/json; charset=utf-8")
         .header("Access-Control-Allow-Origin", "*")
+        .header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+        .header("Access-Control-Allow-Headers", "*")
+        .header("Cache-Control", "no-store")
         .body(body.into_bytes())
         .unwrap()
+}
+
+fn cors_preflight_response() -> Response<Vec<u8>> {
+    Response::builder()
+        .status(StatusCode::NO_CONTENT)
+        .header("Access-Control-Allow-Origin", "*")
+        .header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+        .header("Access-Control-Allow-Headers", "*")
+        .body(Vec::new())
+        .unwrap()
+}
+
+fn extract_32_hex(raw: &str) -> Option<String> {
+    let bytes = raw.as_bytes();
+    if bytes.len() < 32 {
+        return None;
+    }
+    for i in 0..=bytes.len() - 32 {
+        let slice = &bytes[i..i + 32];
+        if slice.iter().all(|b| b.is_ascii_hexdigit()) {
+            let prev_hex = i > 0 && bytes[i - 1].is_ascii_hexdigit();
+            let next_hex = i + 32 < bytes.len() && bytes[i + 32].is_ascii_hexdigit();
+            if !prev_hex && !next_hex {
+                return Some(std::str::from_utf8(slice).unwrap_or("").to_ascii_lowercase());
+            }
+        }
+    }
+    None
+}
+
+fn upsert_contact_from_fields(
+    mut petname: String,
+    mut label: String,
+    mut hash: String,
+    mut scheme: String,
+    mut cpath: String,
+    mut notes: String,
+    card: Option<&str>,
+) -> Result<Vec<contacts::Contact>, String> {
+    if let Some(card_raw) = card {
+        let trimmed = card_raw.trim();
+        if let Some(rest) = trimmed.strip_prefix("bifrost-card://") {
+            let (main_part, query_part) = match rest.split_once('?') {
+                Some((m, q)) => (m, Some(q)),
+                None => (rest, None),
+            };
+            let (id_part, path_part) = match main_part.find('/') {
+                Some(idx) => (&main_part[..idx], &main_part[idx..]),
+                None => (main_part, "/"),
+            };
+            if let Some((p, h)) = id_part.split_once('@') {
+                if petname.trim().is_empty() {
+                    petname = p.to_string();
+                }
+                if hash.trim().is_empty() {
+                    hash = h.to_string();
+                }
+            } else if hash.trim().is_empty() {
+                hash = id_part.to_string();
+            }
+            if !path_part.is_empty() && cpath == "/" {
+                cpath = path_part.to_string();
+            }
+            if let Some(q) = query_part {
+                if let Some(l) = parse_query_param(q, "label") {
+                    if label.trim().is_empty() {
+                        label = l;
+                    }
+                }
+                if let Some(n) = parse_query_param(q, "notes") {
+                    if notes.trim().is_empty() {
+                        notes = n;
+                    }
+                }
+                if let Some(s) = parse_query_param(q, "scheme") {
+                    if !s.trim().is_empty() {
+                        scheme = s;
+                    }
+                }
+            }
+        } else if hash.trim().is_empty() {
+            if let Some(h) = extract_32_hex(trimmed) {
+                hash = h;
+            }
+        }
+    }
+
+    // Allow pasting full bifrost://<32-hex>/... or ironpass://<32-hex>/... directly into the hash box
+    if !contacts::is_valid_hash(hash.trim()) {
+        if let Some(h) = extract_32_hex(&hash) {
+            if hash.trim().starts_with("ironpass://") && scheme == "bifrost" {
+                scheme = "ironpass".to_string();
+            }
+            hash = h;
+        }
+    }
+
+    // Auto-derive petname from label (or hash prefix) if left blank
+    if petname.trim().is_empty() {
+        let fallback_src = if !label.trim().is_empty() {
+            label.trim().to_string()
+        } else if hash.len() >= 8 {
+            format!("node-{}", &hash[..8])
+        } else {
+            String::new()
+        };
+        let slug: String = fallback_src
+            .to_ascii_lowercase()
+            .chars()
+            .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+            .collect();
+        let trimmed_slug = slug.trim_matches('-').to_string();
+        if !trimmed_slug.is_empty() {
+            petname = trimmed_slug;
+        }
+    }
+
+    if scheme.trim().is_empty() {
+        scheme = "bifrost".to_string();
+    }
+    if cpath.trim().is_empty() {
+        cpath = "/".to_string();
+    }
+
+    let entry = contacts::Contact {
+        petname,
+        label,
+        hash,
+        scheme,
+        path: cpath,
+        notes,
+        updated_at: 0,
+    };
+    contacts::upsert_contact(entry)
 }
 
 fn spawn_mesh_handler(
@@ -282,6 +419,10 @@ fn spawn_mesh_handler(
     let client = Arc::clone(&ctx.client);
 
     rt.spawn(async move {
+        if method.eq_ignore_ascii_case("OPTIONS") {
+            responder.respond(cors_preflight_response());
+            return;
+        }
         if host.eq_ignore_ascii_case("home") {
             if path == "/" || path == "/index.html" {
                 let html = ui::HOME_HTML
@@ -349,6 +490,29 @@ fn spawn_mesh_handler(
                 responder.respond(json_response(StatusCode::OK, payload.to_string()));
                 return;
             }
+            if path == "/api/contacts/save" || path.starts_with("/api/contacts/save?") {
+                let q = path.split_once('?').map(|(_, q)| q).unwrap_or("");
+                let petname = parse_query_param(q, "petname").unwrap_or_default();
+                let label = parse_query_param(q, "label").unwrap_or_default();
+                let hash = parse_query_param(q, "hash").unwrap_or_default();
+                let scheme = parse_query_param(q, "scheme").unwrap_or_else(|| "bifrost".to_string());
+                let cpath = parse_query_param(q, "path").unwrap_or_else(|| "/".to_string());
+                let notes = parse_query_param(q, "notes").unwrap_or_default();
+                let card = parse_query_param(q, "card");
+                match upsert_contact_from_fields(petname, label, hash, scheme, cpath, notes, card.as_deref()) {
+                    Ok(list) => responder.respond(json_response(StatusCode::OK, serde_json::json!({ "ok": true, "contacts": list }).to_string())),
+                    Err(err) => responder.respond(json_response(StatusCode::BAD_REQUEST, serde_json::json!({ "ok": false, "error": err }).to_string())),
+                }
+                return;
+            }
+            if path == "/api/contacts/delete" || path.starts_with("/api/contacts/delete?") {
+                let petname = path.split_once('?').and_then(|(_, q)| parse_query_param(q, "petname")).unwrap_or_default();
+                match contacts::delete_contact(&petname) {
+                    Ok(list) => responder.respond(json_response(StatusCode::OK, serde_json::json!({ "ok": true, "contacts": list }).to_string())),
+                    Err(err) => responder.respond(json_response(StatusCode::BAD_REQUEST, serde_json::json!({ "ok": false, "error": err }).to_string())),
+                }
+                return;
+            }
             if path == "/api/contacts" || path.starts_with("/api/contacts?") {
                 if method.eq_ignore_ascii_case("GET") {
                     let list = contacts::load_contacts();
@@ -369,40 +533,14 @@ fn spawn_mesh_handler(
                             return;
                         }
                     };
-                    let mut petname = req_json.get("petname").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                    let mut label = req_json.get("label").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                    let mut hash = req_json.get("hash").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                    let mut scheme = req_json.get("scheme").and_then(|v| v.as_str()).unwrap_or("bifrost").to_string();
-                    let mut cpath = req_json.get("path").and_then(|v| v.as_str()).unwrap_or("/").to_string();
-                    let mut notes = req_json.get("notes").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                    if let Some(card) = req_json.get("card").and_then(|v| v.as_str()) {
-                        if let Some(rest) = card.trim().strip_prefix("bifrost-card://") {
-                            let (main_part, query_part) = match rest.split_once('?') {
-                                Some((m, q)) => (m, Some(q)),
-                                None => (rest, None),
-                            };
-                            let (id_part, path_part) = match main_part.find('/') {
-                                Some(idx) => (&main_part[..idx], &main_part[idx..]),
-                                None => (main_part, "/"),
-                            };
-                            if let Some((p, h)) = id_part.split_once('@') {
-                                if petname.is_empty() { petname = p.to_string(); }
-                                if hash.is_empty() { hash = h.to_string(); }
-                            } else if hash.is_empty() {
-                                hash = id_part.to_string();
-                            }
-                            if !path_part.is_empty() && cpath == "/" {
-                                cpath = path_part.to_string();
-                            }
-                            if let Some(q) = query_part {
-                                if let Some(l) = parse_query_param(q, "label") { if label.is_empty() { label = l; } }
-                                if let Some(n) = parse_query_param(q, "notes") { if notes.is_empty() { notes = n; } }
-                                if let Some(s) = parse_query_param(q, "scheme") { scheme = s; }
-                            }
-                        }
-                    }
-                    let entry = contacts::Contact { petname, label, hash, scheme, path: cpath, notes, updated_at: 0 };
-                    match contacts::upsert_contact(entry) {
+                    let petname = req_json.get("petname").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    let label = req_json.get("label").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    let hash = req_json.get("hash").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    let scheme = req_json.get("scheme").and_then(|v| v.as_str()).unwrap_or("bifrost").to_string();
+                    let cpath = req_json.get("path").and_then(|v| v.as_str()).unwrap_or("/").to_string();
+                    let notes = req_json.get("notes").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                    let card = req_json.get("card").and_then(|v| v.as_str());
+                    match upsert_contact_from_fields(petname, label, hash, scheme, cpath, notes, card) {
                         Ok(list) => responder.respond(json_response(StatusCode::OK, serde_json::json!({ "ok": true, "contacts": list }).to_string())),
                         Err(err) => responder.respond(json_response(StatusCode::BAD_REQUEST, serde_json::json!({ "ok": false, "error": err }).to_string())),
                     }
@@ -417,15 +555,33 @@ fn spawn_mesh_handler(
                     return;
                 }
             }
-            if path == "/api/ai-chat" && method.eq_ignore_ascii_case("POST") {
+            if (path == "/api/ai-chat" || path.starts_with("/api/ai-chat?"))
+                && (method.eq_ignore_ascii_case("POST") || method.eq_ignore_ascii_case("GET"))
+            {
                 let t0 = Instant::now();
-                let req_json: serde_json::Value = match serde_json::from_slice(&body) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        let out = serde_json::json!({ "ok": false, "error": format!("Invalid JSON body: {e}") });
-                        responder.respond(json_response(StatusCode::BAD_REQUEST, out.to_string()));
-                        return;
+                let query_payload = path.split_once('?').and_then(|(_, q)| parse_query_param(q, "payload"));
+                let req_json: serde_json::Value = if !body.is_empty() {
+                    match serde_json::from_slice(&body) {
+                        Ok(v) => v,
+                        Err(e) => {
+                            let out = serde_json::json!({ "ok": false, "error": format!("Invalid JSON body: {e}") });
+                            responder.respond(json_response(StatusCode::BAD_REQUEST, out.to_string()));
+                            return;
+                        }
                     }
+                } else if let Some(ref qp) = query_payload {
+                    match serde_json::from_str(qp) {
+                        Ok(v) => v,
+                        Err(e) => {
+                            let out = serde_json::json!({ "ok": false, "error": format!("Invalid JSON payload param: {e}") });
+                            responder.respond(json_response(StatusCode::BAD_REQUEST, out.to_string()));
+                            return;
+                        }
+                    }
+                } else {
+                    let out = serde_json::json!({ "ok": false, "error": "Empty AI chat payload" });
+                    responder.respond(json_response(StatusCode::BAD_REQUEST, out.to_string()));
+                    return;
                 };
 
                 let model = req_json
@@ -854,6 +1010,10 @@ fn main() -> Result<()> {
             let client = Arc::clone(&client_ironpass);
 
             rt_ironpass.spawn(async move {
+                if method.eq_ignore_ascii_case("OPTIONS") {
+                    responder.respond(cors_preflight_response());
+                    return;
+                }
                 // Built-in Local Sandbox DPP & Live Hash-Chained IronPass Ledger (zero external servers!)
                 if host.eq_ignore_ascii_case("local-demo") {
                     let clean_path = path.split('?').next().unwrap_or(&path).trim_matches('/');
