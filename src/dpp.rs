@@ -15,42 +15,87 @@ pub fn make_qr_svg(data: &str) -> String {
     match QrCode::new(data.as_bytes()) {
         Ok(code) => code
             .render::<svg::Color>()
-            .min_dimensions(180, 180)
+            .min_dimensions(200, 200)
             .quiet_zone(true)
             .dark_color(svg::Color("#000000"))
             .light_color(svg::Color("#ffffff"))
             .build(),
-        Err(_) => "<svg width='180' height='180'></svg>".to_string(),
+        Err(_) => "<svg width='200' height='200'></svg>".to_string(),
     }
 }
 
+pub struct QrTagItem {
+    pub id: String,
+    pub title: String,
+    pub sku: String,
+    pub public_url: String,
+}
+
+fn html_esc(s: &str) -> String {
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+}
+
 pub fn render_qr_sheet_html(vault_hash: &str) -> String {
-    let items = [
-        ("battery-01", "Nordic LFP Industrial Battery Pack (EU Battery Passport)", "EU-BATT-LFP-48V-100", "https://example.org/dpp/EU-BATT-LFP-48V-100"),
-        ("drone-01", "Autonomous Inspection UAV — MRO Grade", "UAV-MRO-INSPECT-01", "https://example.org/dpp/UAV-MRO-INSPECT-01"),
-        ("furniture-01", "Nordic Birch Modular Desk (EU ESPR)", "ESPR-WOOD-DESK-2510", "https://example.org/dpp/ESPR-WOOD-DESK-2510"),
+    let defaults = vec![
+        QrTagItem {
+            id: "battery-01".into(),
+            title: "Nordic LFP Industrial Battery Pack (EU Battery Passport)".into(),
+            sku: "EU-BATT-LFP-48V-100".into(),
+            public_url: "https://example.org/dpp/battery-01".into(),
+        },
+        QrTagItem {
+            id: "drone-01".into(),
+            title: "Autonomous Inspection UAV — MRO Grade".into(),
+            sku: "UAV-MRO-INSPECT-01".into(),
+            public_url: "https://example.org/dpp/drone-01".into(),
+        },
+        QrTagItem {
+            id: "furniture-01".into(),
+            title: "Nordic Birch Modular Desk (EU ESPR)".into(),
+            sku: "ESPR-WOOD-DESK-2510".into(),
+            public_url: "https://example.org/dpp/furniture-01".into(),
+        },
     ];
+    render_qr_sheet_html_with_items(vault_hash, &defaults)
+}
+
+pub fn render_qr_sheet_html_with_items(vault_hash: &str, items: &[QrTagItem]) -> String {
     let mut cards = String::new();
-    for (id, title, sku, pub_url) in items {
-        let pure_uri = format!("ironpass://{vault_hash}/dpp/{id}");
-        let hybrid_uri = format!("{pub_url}#ip={vault_hash}/dpp/{id}");
+    for item in items {
+        let pure_uri = format!("ironpass://{vault_hash}/dpp/{}", item.id);
+        let hybrid_uri = format!("{}#ip={vault_hash}/dpp/{}", item.public_url, item.id);
         let pure_svg = make_qr_svg(&pure_uri);
         let hybrid_svg = make_qr_svg(&hybrid_uri);
+        let title = html_esc(&item.title);
+        let sku = html_esc(&item.sku);
+        let pure_esc = html_esc(&pure_uri);
+        let hybrid_esc = html_esc(&hybrid_uri);
         cards.push_str(&format!(
             r#"<div class="tag-pair">
+              <div class="tag-card">
+                <div class="tag-top"><span class="badge hybrid">HYBRID #ip= PUBLIC + VAULT QR</span><span class="sku">{sku}</span></div>
+                <h3>{title}</h3>
+                <div class="qr-wrap">{hybrid_svg}</div>
+                <div class="uri">{hybrid_esc}</div>
+                <div class="hint">Normal phone → Public EU ESPR Page · BIFROST → Ed25519 Verified RNS Vault (#ip=)</div>
+                <div class="actions no-print">
+                  <a class="act primary" href="{pure_esc}">⚡ TEST IN BIFROST</a>
+                  <button class="act" type="button" onclick="copyUri(this, '{hybrid_esc}')">📋 COPY HYBRID URI</button>
+                </div>
+              </div>
               <div class="tag-card">
                 <div class="tag-top"><span class="badge pure">PURE ZERO-IP GHOST QR</span><span class="sku">{sku}</span></div>
                 <h3>{title}</h3>
                 <div class="qr-wrap">{pure_svg}</div>
-                <div class="uri">{pure_uri}</div>
-                <div class="hint">Scan with BIFROST — The Reticulum Ghost Browser (0 DNS · 0 Web2)</div>
-              </div>
-              <div class="tag-card">
-                <div class="tag-top"><span class="badge hybrid">HYBRID PUBLIC + CLASSIFIED QR</span><span class="sku">{sku}</span></div>
-                <h3>{title}</h3>
-                <div class="qr-wrap">{hybrid_svg}</div>
-                <div class="uri">{hybrid_uri}</div>
-                <div class="hint">Normal phone → Public whatt.io DPP · BIFROST → Classified RNS Vault (#ip=)</div>
+                <div class="uri">{pure_esc}</div>
+                <div class="hint">Scan with BIFROST Ghost Browser (0 DNS · 0 HTTPS · Ed25519 + EPCIS Ledger)</div>
+                <div class="actions no-print">
+                  <a class="act primary" href="{pure_esc}">⚡ TEST IN BIFROST</a>
+                  <button class="act" type="button" onclick="copyUri(this, '{pure_esc}')">📋 COPY ironpass://</button>
+                </div>
               </div>
             </div>"#
         ));
@@ -61,28 +106,31 @@ pub fn render_qr_sheet_html(vault_hash: &str) -> String {
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>IRONPASS // PRINTABLE QR DEMO TAG SHEET</title>
+<title>IRONPASS // PRINTABLE HYBRID &amp; ZERO-IP QR TAG SHEET</title>
 <style>
   * {{ box-sizing:border-box; margin:0; padding:0; }}
-  body {{ background:#f8fafc; color:#0f172a; font-family:system-ui,-apple-system,sans-serif; padding:24px; }}
+  body {{ background:#f8fafc; color:#0f172a; font-family:system-ui,-apple-system,sans-serif; padding:52px 24px 24px; }}
   .bar {{ max-width:1040px; margin:0 auto 18px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; background:#020503; color:#f2faf5; padding:14px 18px; border-radius:12px; }}
-  .bar h1 {{ font-size:16px; letter-spacing:0.08em; font-family:ui-monospace,monospace; }}
-  .bar p {{ font-size:11.5px; color:#9ec0ac; margin-top:2px; }}
+  .bar h1 {{ font-size:15px; letter-spacing:0.08em; font-family:ui-monospace,monospace; }}
+  .bar p {{ font-size:11px; color:#9ec0ac; margin-top:3px; font-family:ui-monospace,monospace; }}
   .btn {{ background:#84cc16; color:#020503; border:none; padding:9px 15px; border-radius:8px; font-weight:800; font-size:12px; cursor:pointer; text-decoration:none; font-family:ui-monospace,monospace; }}
   .btn.ghost {{ background:transparent; color:#bef264; border:1px solid #84cc16; }}
   .sheet {{ max-width:1040px; margin:0 auto; display:flex; flex-direction:column; gap:16px; }}
   .tag-pair {{ display:grid; grid-template-columns:1fr 1fr; gap:16px; page-break-inside:avoid; }}
-  .tag-card {{ background:#fff; border:2px dashed #94a3b8; border-radius:12px; padding:14px 16px; display:flex; flex-direction:column; align-items:center; text-align:center; gap:8px; }}
+  .tag-card {{ background:#fff; border:2px dashed #64748b; border-radius:12px; padding:14px 16px; display:flex; flex-direction:column; align-items:center; text-align:center; gap:8px; }}
   .tag-top {{ width:100%; display:flex; justify-content:space-between; align-items:center; font-family:ui-monospace,monospace; font-size:10px; font-weight:800; }}
   .badge {{ padding:3px 8px; border-radius:999px; }}
   .badge.pure {{ background:#020503; color:#84cc16; }}
   .badge.hybrid {{ background:#0c4a6e; color:#bae6fd; }}
   .sku {{ color:#475569; }}
-  .tag-card h3 {{ font-size:15px; font-weight:800; color:#0f172a; }}
+  .tag-card h3 {{ font-size:14px; font-weight:800; color:#0f172a; }}
   .qr-wrap {{ padding:8px; background:#fff; border:1px solid #e2e8f0; border-radius:8px; }}
-  .qr-wrap svg {{ width:180px; height:180px; display:block; }}
-  .uri {{ font-family:ui-monospace,monospace; font-size:9.5px; color:#334155; word-break:break-all; background:#f1f5f9; padding:5px 8px; border-radius:6px; width:100%; }}
-  .hint {{ font-size:10.5px; color:#64748b; }}
+  .qr-wrap svg {{ width:200px; height:200px; display:block; }}
+  .uri {{ font-family:ui-monospace,monospace; font-size:9px; color:#334155; word-break:break-all; background:#f1f5f9; padding:6px 8px; border-radius:6px; width:100%; }}
+  .hint {{ font-size:10px; color:#475569; }}
+  .actions {{ display:flex; gap:6px; width:100%; margin-top:2px; }}
+  .act {{ flex:1; padding:6px 8px; border-radius:6px; border:1px solid #cbd5e1; background:#f8fafc; color:#0f172a; font-family:ui-monospace,monospace; font-size:10px; font-weight:700; cursor:pointer; text-decoration:none; text-align:center; }}
+  .act.primary {{ background:#020503; color:#bef264; border-color:#020503; }}
   @media print {{
     body {{ background:#fff; padding:0; }}
     .no-print {{ display:none !important; }}
@@ -93,8 +141,8 @@ pub fn render_qr_sheet_html(vault_hash: &str) -> String {
 <body>
   <div class="bar no-print">
     <div>
-      <h1>ᛉ IRONPASS // PRINTABLE HYBRID &amp; ZERO-IP QR TAG SHEET</h1>
-      <p>Cut along dashed borders &amp; stick onto physical demo products (Vault Hash: {vault_hash})</p>
+      <h1>ᛉ IRONPASS // LIVE PRINTABLE HYBRID &amp; ZERO-IP QR TAG SHEET</h1>
+      <p>Vault Hash: {vault_hash} · {count} live passports ready for phone &amp; BIFROST scanning</p>
     </div>
     <div style="display:flex; gap:8px;">
       <a class="btn ghost" href="bifrost://home/">← BIFROST HOME</a>
@@ -102,8 +150,22 @@ pub fn render_qr_sheet_html(vault_hash: &str) -> String {
     </div>
   </div>
   <div class="sheet">{cards}</div>
+  <script>
+    function copyUri(btn, text) {{
+      var done = function() {{ var old = btn.textContent; btn.textContent = '✓ COPIED!'; setTimeout(function(){{ btn.textContent = old; }}, 1600); }};
+      try {{ if (navigator.clipboard) {{ navigator.clipboard.writeText(text).then(done).catch(fallback); return; }} }} catch(_) {{}}
+      fallback();
+      function fallback() {{
+        try {{
+          var ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.left = '-9999px';
+          document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); done();
+        }} catch(_) {{}}
+      }}
+    }}
+  </script>
 </body>
-</html>"#
+</html>"#,
+        count = items.len()
     )
 }
 

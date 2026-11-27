@@ -504,14 +504,73 @@ fn spawn_mesh_handler(
                 return;
             }
             if path == "/qr-sheet" || path == "/qr-sheet/" {
-                let vault_hash = client
-                    .list_peers()
-                    .await
-                    .into_iter()
-                    .next()
-                    .map(|p| p.hash)
+                let peers = client.list_peers().await;
+                let vault_hash = peers
+                    .iter()
+                    .find(|p| {
+                        let a = p.alias.to_lowercase();
+                        a.contains("ironpass") || a.contains("forge")
+                    })
+                    .or_else(|| peers.first())
+                    .map(|p| p.hash.clone())
                     .unwrap_or_else(|| "local-demo".to_string());
-                responder.respond(html_response(StatusCode::OK, dpp::render_qr_sheet_html(&vault_hash)));
+
+                let mut public_base = "https://example.org/dpp".to_string();
+                let mut live_items: Vec<dpp::QrTagItem> = Vec::new();
+                if vault_hash != "local-demo" {
+                    if let Ok(st) = client
+                        .request(&vault_hash, "GET", "/api/status", HashMap::new(), Vec::new(), Duration::from_secs(4))
+                        .await
+                    {
+                        if let Ok(v) = serde_json::from_slice::<serde_json::Value>(&st.body) {
+                            if let Some(u) = v.get("publicBaseUrl").and_then(|x| x.as_str()) {
+                                let trimmed = u.trim().trim_end_matches('/');
+                                if !trimmed.is_empty() {
+                                    public_base = trimmed.to_string();
+                                }
+                            }
+                        }
+                    }
+                    if let Ok(resp) = client
+                        .request(&vault_hash, "GET", "/api/dpp/my-dpps", HashMap::new(), Vec::new(), Duration::from_secs(6))
+                        .await
+                    {
+                        if let Ok(v) = serde_json::from_slice::<serde_json::Value>(&resp.body) {
+                            if let Some(arr) = v.get("dpps").and_then(|x| x.as_array()) {
+                                for entry in arr {
+                                    let id = entry.get("id").and_then(|x| x.as_str()).unwrap_or("").trim();
+                                    if id.is_empty() {
+                                        continue;
+                                    }
+                                    let title = entry
+                                        .get("productName")
+                                        .and_then(|x| x.as_str())
+                                        .unwrap_or(id)
+                                        .to_string();
+                                    let sku = entry
+                                        .get("gtin")
+                                        .and_then(|x| x.as_str())
+                                        .filter(|s| !s.is_empty())
+                                        .unwrap_or(id)
+                                        .to_string();
+                                    live_items.push(dpp::QrTagItem {
+                                        id: id.to_string(),
+                                        title,
+                                        sku,
+                                        public_url: format!("{public_base}/{id}"),
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+
+                let html = if live_items.is_empty() {
+                    dpp::render_qr_sheet_html(&vault_hash)
+                } else {
+                    dpp::render_qr_sheet_html_with_items(&vault_hash, &live_items)
+                };
+                responder.respond(html_response(StatusCode::OK, html));
                 return;
             }
             if path == "/api/peers" || path.starts_with("/api/peers?") {
