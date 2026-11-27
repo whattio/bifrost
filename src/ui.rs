@@ -269,6 +269,13 @@ pub const HOME_HTML: &str = r##"<!DOCTYPE html>
         </form>
         <div id="relay-msg" class="mono" style="font-size:10.5px;color:var(--muted);"></div>
       </div>
+      <div class="peer-card" style="border-color:rgba(16,185,129,0.38);">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+          <div class="mono" style="font-size:11px;font-weight:800;color:#6ee7b7;">💾 ENCRYPTED ASSET CACHE (SHA-256-CTR + HMAC)</div>
+          <button type="button" class="btn-sm amber mono" onclick="clearEncCache()">🧹 CLEAR</button>
+        </div>
+        <div id="enc-cache-info" class="mono" style="font-size:11px;color:var(--muted);">0 files · 0.0 MB (static JS/CSS/3D models only · dynamic routes bypassed)</div>
+      </div>
       <div id="peers-list" style="display:flex; flex-direction:column; gap:10px;"></div>
     </aside>
   </div>
@@ -884,6 +891,23 @@ async function removeRelayPeer(addr) {
   }
 }
 
+async function clearEncCache() {
+  const info = document.getElementById('enc-cache-info');
+  if (info) info.textContent = 'Clearing encrypted asset cache...';
+  try {
+    const r = await fetch(`/api/cache/clear?_t=${Date.now()}`);
+    const d = await r.json();
+    if (info) info.textContent = `Cleared ${d.removed || 0} files · 0.0 MB encrypted on disk`;
+    refreshPeers();
+  } catch (_) {
+    if (window.ipc && window.ipc.postMessage) {
+      window.ipc.postMessage(JSON.stringify({ cmd: 'clear_cache' }));
+      if (info) info.textContent = 'Cleared via native IPC.';
+      setTimeout(refreshPeers, 250);
+    }
+  }
+}
+
 async function refreshPeers() {
   try {
     const r = await fetch(`/api/peers?_t=${Date.now()}`);
@@ -911,6 +935,11 @@ async function refreshPeers() {
         ifacEl.className = 'status-chip waiting';
         ifacEl.textContent = 'IFAC: OFF';
       }
+    }
+    const cacheEl = document.getElementById('enc-cache-info');
+    if (cacheEl && typeof d.cache_files === 'number') {
+      const mb = ((d.cache_bytes || 0) / (1024 * 1024)).toFixed(2);
+      cacheEl.textContent = `${d.cache_files} encrypted files · ${mb} MB (static JS/CSS/3D twins · <15 ms reload)`;
     }
     const peers = d.peers || [];
     latestPeers = peers;

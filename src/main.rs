@@ -9,6 +9,7 @@
 //! - Local Rust verification of Ed25519-signed EU ESPR DPPs & hash-chained GS1 EPCIS 2.0 Ledgers
 //! - Optional local Sovereign AI Omnibox backed by any OpenAI-compatible NPU/Ollama/llama.cpp peer
 
+mod cache;
 mod contacts;
 mod dpp;
 mod sandbox;
@@ -586,6 +587,7 @@ fn spawn_mesh_handler(
                         .map(|p| p.hash.clone())
                 });
                 let relays = client.configured_peers().await;
+                let cstats = cache::stats();
                 let payload = serde_json::json!({
                     "ok": true,
                     "version": env!("BIFROST_VERSION"),
@@ -600,10 +602,24 @@ fn spawn_mesh_handler(
                     "allow_hashes": ctx.allow_label,
                     "llm_hash": detected_llm,
                     "llm_model": ctx.llm_model,
+                    "cache_files": cstats.files,
+                    "cache_bytes": cstats.bytes,
                     "bookmarks": bookmarks,
                     "peers": peers,
                 });
                 responder.respond(json_response(StatusCode::OK, payload.to_string()));
+                return;
+            }
+            if path == "/api/cache/clear" || path.starts_with("/api/cache/clear?") {
+                let removed = cache::clear();
+                let cstats = cache::stats();
+                let out = serde_json::json!({
+                    "ok": true,
+                    "removed": removed,
+                    "cache_files": cstats.files,
+                    "cache_bytes": cstats.bytes,
+                });
+                responder.respond(json_response(StatusCode::OK, out.to_string()));
                 return;
             }
             if path == "/api/relays/add" || path.starts_with("/api/relays/add?") {
@@ -989,17 +1005,65 @@ fn spawn_mesh_handler(
         // Zero-DNS Local Sovereign Petname Resolution (`bifrost://forge/` -> 32-hex hash)
         let resolved_host = contacts::resolve_host_to_hash(&host);
 
+        // Encrypted Local Immutable Asset Cache (Vite bundles, 3D twins, fonts/icons -> <15ms repeat loads)
+        let cacheable = cache::is_cacheable_path(&method, &path);
+        if cacheable {
+            let ch_host = resolved_host.clone();
+            let ch_path = path.clone();
+            if let Ok(Some(hit)) = tokio::task::spawn_blocking(move || cache::get(&ch_host, &ch_path)).await {
+                let st = StatusCode::from_u16(hit.status).unwrap_or(StatusCode::OK);
+                let mut builder = Response::builder()
+                    .status(st)
+                    .header("Access-Control-Allow-Origin", "*")
+                    .header("x-bifrost-transport", "encrypted-local-cache")
+                    .header("x-bifrost-cache", "HIT-ENC");
+                let mut has_ct = false;
+                for (k, v) in hit.headers {
+                    if k.eq_ignore_ascii_case("content-type") {
+                        has_ct = true;
+                    }
+                    if let (Ok(hn), Ok(hv)) = (
+                        header::HeaderName::from_bytes(k.as_bytes()),
+                        header::HeaderValue::from_str(&v),
+                    ) {
+                        builder = builder.header(hn, hv);
+                    }
+                }
+                if !has_ct {
+                    builder = builder.header(header::CONTENT_TYPE, "application/octet-stream");
+                }
+                responder.respond(builder.body(hit.body).unwrap());
+                return;
+            }
+        }
+
         // Live In-Process Reticulum Fetch -> 0-Port Ghost Linux Server
         match client
             .request(&resolved_host, &method, &path, hdrs, body, Duration::from_secs(60))
             .await
         {
             Ok(resp) => {
+                if cacheable && resp.status == 200 {
+                    let put_host = resolved_host.clone();
+                    let put_path = path.clone();
+                    let put_status = resp.status;
+                    let put_hdrs: Vec<(String, String)> = resp
+                        .headers
+                        .iter()
+                        .filter(|(k, _)| !k.eq_ignore_ascii_case("content-encoding"))
+                        .cloned()
+                        .collect();
+                    let put_body = resp.body.clone();
+                    tokio::task::spawn_blocking(move || {
+                        cache::put(&put_host, &put_path, put_status, &put_hdrs, &put_body);
+                    });
+                }
                 let st = StatusCode::from_u16(resp.status).unwrap_or(StatusCode::OK);
                 let mut builder = Response::builder()
                     .status(st)
                     .header("Access-Control-Allow-Origin", "*")
-                    .header("x-bifrost-transport", "reticulum-rs-mit-inprocess");
+                    .header("x-bifrost-transport", "reticulum-rs-mit-inprocess")
+                    .header("x-bifrost-cache", if cacheable { "MISS-STORED" } else { "BYPASS" });
                 let mut has_ct = false;
                 for (k, v) in resp.headers {
                     if k.eq_ignore_ascii_case("content-type") {
@@ -1203,6 +1267,9 @@ fn main() -> Result<()> {
                 "delete_contact" => {
                     let petname = v.get("petname").and_then(|s| s.as_str()).unwrap_or("");
                     let _ = contacts::delete_contact(petname);
+                }
+                "clear_cache" => {
+                    let _ = cache::clear();
                 }
                 _ => {}
             }
