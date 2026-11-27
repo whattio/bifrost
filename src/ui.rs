@@ -183,6 +183,7 @@ pub const HOME_HTML: &str = r##"<!DOCTYPE html>
     </div>
     <div class="top-right">
       <button type="button" class="top-btn mono" id="think-toggle" onclick="toggleThinking()">🧠 THINK: OFF</button>
+      <button type="button" class="top-btn mono" onclick="openQrScanner()" style="border-color:rgba(132,204,22,0.55);color:#bef264;">📷 SCAN QR</button>
       <a class="top-btn mono" href="bifrost://home/qr-sheet">🖨️ QR TAGS</a>
       <button type="button" class="top-btn mono" id="contacts-btn" onclick="openContacts()" title="Local Sovereign Contact Book (~/.config/bifrost/contacts.json · 0 DNS)">📒 CONTACTS (0)</button>
       <button type="button" class="top-btn mono" id="nodes-btn" onclick="openDrawer()">📡 NODES (0)</button>
@@ -304,6 +305,42 @@ pub const HOME_HTML: &str = r##"<!DOCTYPE html>
     </aside>
   </div>
 
+  <div class="drawer-backdrop" id="qr-backdrop" onclick="if(event.target===this) closeQrScanner()">
+    <aside class="drawer">
+      <div class="drawer-head">
+        <h2 class="mono" style="font-size:15px;">📷 IRONPASS HYBRID QR SCANNER</h2>
+        <button type="button" class="top-btn mono" onclick="closeQrScanner()">✕ CLOSE</button>
+      </div>
+      <div class="mono" style="font-size:11px; color:var(--muted);">
+        100% offline local QR decoding (0 cloud calls). Hold a printed <strong>Hybrid #ip=</strong>, <strong>ironpass://</strong>, or <strong>bifrost-card://</strong> tag to your camera, drop/paste a QR screenshot, or scan with a USB scanner.
+      </div>
+      <div class="peer-card" style="border-color:rgba(132,204,22,0.45); align-items:center;">
+        <div style="position:relative; width:100%; max-width:380px; aspect-ratio:4/3; background:#020604; border:1px solid rgba(132,204,22,0.35); border-radius:10px; overflow:hidden; display:flex; align-items:center; justify-content:center;">
+          <video id="qr-video" autoplay playsinline muted style="width:100%; height:100%; object-fit:cover; display:none;"></video>
+          <div id="qr-placeholder" class="mono" style="font-size:11px; color:var(--muted); text-align:center; padding:16px;">Camera idle — click START CAMERA below or drop/upload a QR image.</div>
+          <div style="position:absolute; inset:16%; border:2px dashed rgba(132,204,22,0.6); border-radius:10px; pointer-events:none;"></div>
+        </div>
+        <canvas id="qr-canvas" style="display:none;"></canvas>
+        <div style="display:flex; flex-wrap:wrap; gap:8px; width:100%; justify-content:center;">
+          <button type="button" class="btn-sm mono" id="qr-cam-btn" onclick="toggleQrCamera()">🎥 START CAMERA</button>
+          <label class="btn-sm mono" style="display:inline-flex; align-items:center; gap:4px; cursor:pointer; background:rgba(56,189,248,0.14); color:#bae6fd; border-color:rgba(56,189,248,0.45);">
+            🖼️ UPLOAD QR IMAGE
+            <input type="file" id="qr-file-input" accept="image/*" style="display:none;" onchange="decodeQrImageFile(event)" />
+          </label>
+        </div>
+        <div id="qr-status" class="mono" style="font-size:11px; color:var(--lime); text-align:center; word-break:break-all;">Ready to scan.</div>
+      </div>
+      <div class="peer-card" style="border-color:rgba(56,189,248,0.38);">
+        <div class="mono" style="font-size:11px; font-weight:800; color:#7dd3fc;">⌨️ USB QR SCANNER / PASTE HYBRID #ip= LINK</div>
+        <form onsubmit="event.preventDefault(); submitQrManual();" style="display:flex; gap:6px;">
+          <input id="qr-manual-input" class="mono" placeholder="Scan with USB reader or paste https://...#ip=..." style="flex:1; background:rgba(2,8,5,0.92); border:1px solid var(--border); color:#fff; border-radius:8px; padding:7px 9px; font-size:11px; outline:none;" />
+          <button type="submit" class="btn-sm mono">GO →</button>
+        </form>
+      </div>
+    </aside>
+  </div>
+
+<script src="/js/jsqr.js"></script>
 <script>
 const conversation = [];
 let isBusy = false;
@@ -472,6 +509,159 @@ async function handleOmnibox(e) {
 
 function openDrawer() { document.getElementById('drawer-backdrop').classList.add('open'); refreshPeers(); }
 function closeDrawer() { document.getElementById('drawer-backdrop').classList.remove('open'); }
+
+let qrStream = null;
+let qrScanTimer = null;
+
+function openQrScanner() {
+  document.getElementById('qr-backdrop').classList.add('open');
+  const st = document.getElementById('qr-status');
+  if (st) { st.style.color = 'var(--lime)'; st.textContent = 'Ready — click START CAMERA, upload/paste a QR image (Ctrl+V / Cmd+V), or scan via USB.'; }
+  setTimeout(() => { const m = document.getElementById('qr-manual-input'); if (m) m.focus(); }, 60);
+}
+
+function stopQrCamera() {
+  if (qrScanTimer) { clearInterval(qrScanTimer); qrScanTimer = null; }
+  if (qrStream) {
+    try { qrStream.getTracks().forEach(t => t.stop()); } catch (_) {}
+    qrStream = null;
+  }
+  const v = document.getElementById('qr-video');
+  const ph = document.getElementById('qr-placeholder');
+  const btn = document.getElementById('qr-cam-btn');
+  if (v) { v.srcObject = null; v.style.display = 'none'; }
+  if (ph) ph.style.display = 'block';
+  if (btn) btn.textContent = '🎥 START CAMERA';
+}
+
+function closeQrScanner() {
+  stopQrCamera();
+  document.getElementById('qr-backdrop').classList.remove('open');
+}
+
+function handleDecodedQrPayload(raw) {
+  const txt = (raw || '').trim();
+  const st = document.getElementById('qr-status');
+  if (!txt) return false;
+  const hybrid = txt.match(/#ip=([^\s]+)/i);
+  if (hybrid && hybrid[1]) {
+    const dest = 'ironpass://' + hybrid[1].replace(/^\/+/, '');
+    if (st) { st.style.color = 'var(--lime)'; st.textContent = `✓ HYBRID #ip= DETECTED — Stripping HTTPS locally → ${dest}`; }
+    stopQrCamera();
+    setTimeout(() => { window.location.href = dest; }, 350);
+    return true;
+  }
+  if (/^bifrost-card:\/\//i.test(txt)) {
+    closeQrScanner();
+    openContacts();
+    document.getElementById('cb-card').value = txt;
+    parseInviteCardInput();
+    return true;
+  }
+  if (/^(ironpass|bifrost|citadel):\/\//i.test(txt)) {
+    if (st) { st.style.color = 'var(--lime)'; st.textContent = `✓ OPENING ZERO-IP URI → ${txt}`; }
+    stopQrCamera();
+    setTimeout(() => { window.location.href = txt; }, 250);
+    return true;
+  }
+  if (/^[0-9a-f]{32}(\/.*)?$/i.test(txt)) {
+    const dest = 'bifrost://' + (txt.includes('/') ? txt : txt + '/');
+    if (st) { st.style.color = 'var(--lime)'; st.textContent = `✓ 128-BIT HASH → ${dest}`; }
+    stopQrCamera();
+    setTimeout(() => { window.location.href = dest; }, 250);
+    return true;
+  }
+  if (st) { st.style.color = 'var(--amber)'; st.textContent = `Decoded non-Reticulum QR (blocked by Ghost isolation): ${txt}`; }
+  return false;
+}
+
+function submitQrManual() {
+  const inp = document.getElementById('qr-manual-input');
+  const val = (inp.value || '').trim();
+  if (!val) return;
+  if (handleDecodedQrPayload(val)) inp.value = '';
+}
+
+async function toggleQrCamera() {
+  if (qrStream) { stopQrCamera(); return; }
+  const st = document.getElementById('qr-status');
+  const v = document.getElementById('qr-video');
+  const ph = document.getElementById('qr-placeholder');
+  const btn = document.getElementById('qr-cam-btn');
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    if (st) { st.style.color = 'var(--amber)'; st.textContent = 'WebView camera API unavailable on custom scheme — use 🖼️ UPLOAD QR IMAGE, paste a screenshot (Ctrl+V/Cmd+V), or USB scanner!'; }
+    return;
+  }
+  if (st) { st.style.color = 'var(--muted)'; st.textContent = 'Requesting local webcam...'; }
+  try {
+    qrStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+    v.srcObject = qrStream;
+    v.style.display = 'block';
+    if (ph) ph.style.display = 'none';
+    if (btn) btn.textContent = '⏹ STOP CAMERA';
+    if (st) { st.style.color = 'var(--lime)'; st.textContent = 'Camera LIVE — hold printed Hybrid #ip= or ironpass:// QR inside the frame...'; }
+    const canvas = document.getElementById('qr-canvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    qrScanTimer = setInterval(() => {
+      if (!v || v.readyState < 2 || !window.jsQR) return;
+      canvas.width = v.videoWidth || 640;
+      canvas.height = v.videoHeight || 480;
+      ctx.drawImage(v, 0, 0, canvas.width, canvas.height);
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = window.jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: 'attemptBoth' });
+      if (code && code.data) {
+        handleDecodedQrPayload(code.data);
+      }
+    }, 150);
+  } catch (err) {
+    if (st) { st.style.color = 'var(--amber)'; st.textContent = `Camera blocked (${err.message || err}) — use 🖼️ UPLOAD QR IMAGE or paste a screenshot (Ctrl+V / Cmd+V)!`; }
+  }
+}
+
+function decodeQrFromBlob(blob) {
+  const st = document.getElementById('qr-status');
+  if (!blob || !window.jsQR) return;
+  const url = URL.createObjectURL(blob);
+  const img = new Image();
+  img.onload = () => {
+    try {
+      const canvas = document.getElementById('qr-canvas');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      canvas.width = img.naturalWidth || img.width;
+      canvas.height = img.naturalHeight || img.height;
+      ctx.drawImage(img, 0, 0);
+      const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = window.jsQR(imgData.data, imgData.width, imgData.height, { inversionAttempts: 'attemptBoth' });
+      if (code && code.data) {
+        handleDecodedQrPayload(code.data);
+      } else if (st) {
+        st.style.color = 'var(--danger)';
+        st.textContent = 'No QR code detected in that image — try a tighter crop or higher contrast.';
+      }
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  };
+  img.src = url;
+}
+
+function decodeQrImageFile(ev) {
+  const f = ev.target && ev.target.files && ev.target.files[0];
+  if (f) decodeQrFromBlob(f);
+  if (ev.target) ev.target.value = '';
+}
+
+window.addEventListener('paste', (ev) => {
+  const bd = document.getElementById('qr-backdrop');
+  if (!bd || !bd.classList.contains('open')) return;
+  const items = (ev.clipboardData && ev.clipboardData.items) || [];
+  for (const it of items) {
+    if (it.type && it.type.startsWith('image/')) {
+      const blob = it.getAsFile();
+      if (blob) { ev.preventDefault(); decodeQrFromBlob(blob); return; }
+    }
+  }
+});
 function openContacts(prefillHash = '', prefillLabel = '') {
   document.getElementById('contacts-backdrop').classList.add('open');
   if (prefillHash) {

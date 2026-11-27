@@ -124,6 +124,7 @@ const ICON_BIFROST_PNG: &[u8] = include_bytes!("../assets/bifrost-128.png");
 const ICON_CITADEL_PNG: &[u8] = include_bytes!("../assets/citadel-128.png");
 const ICON_IRONPASS_PNG: &[u8] = include_bytes!("../assets/ironpass-128.png");
 const ICON_BIFROST_RGBA64: &[u8] = include_bytes!("../assets/bifrost-64.rgba");
+const JSQR_BUNDLE: &[u8] = include_bytes!("../assets/jsqr.js");
 
 fn resolve_llm_api_key(cli_opt: Option<String>) -> Option<String> {
     if let Some(k) = cli_opt {
@@ -489,6 +490,17 @@ fn spawn_mesh_handler(
             }
             if path == "/icons/ironpass.png" {
                 responder.respond(png_response(ICON_IRONPASS_PNG));
+                return;
+            }
+            if path == "/js/jsqr.js" {
+                let resp = Response::builder()
+                    .status(StatusCode::OK)
+                    .header(header::CONTENT_TYPE, "application/javascript; charset=utf-8")
+                    .header("Access-Control-Allow-Origin", "*")
+                    .header("Cache-Control", "public, max-age=86400")
+                    .body(JSQR_BUNDLE.to_vec())
+                    .unwrap();
+                responder.respond(resp);
                 return;
             }
             if path == "/qr-sheet" || path == "/qr-sheet/" {
