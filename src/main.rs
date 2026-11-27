@@ -1038,14 +1038,29 @@ fn spawn_mesh_handler(
             }
         }
 
-        // Live In-Process Reticulum Fetch -> 0-Port Ghost Linux Server
+        // Strip conditional cache headers: WebKitGTK incognito custom-scheme cannot satisfy empty 304 responses
+        hdrs.remove("if-none-match");
+        hdrs.remove("if-modified-since");
+
+        // Live In-Process Reticulum Fetch -> 0-Port Ghost Linux Server (auto-retry once on dropped GET chunk)
         let req_timeout = if cacheable { Duration::from_secs(120) } else { Duration::from_secs(60) };
-        match client
-            .request(&resolved_host, &method, &path, hdrs, body, req_timeout)
-            .await
-        {
+        let mut req_result = client
+            .request(&resolved_host, &method, &path, hdrs.clone(), body.clone(), req_timeout)
+            .await;
+        if req_result.is_err() && method.eq_ignore_ascii_case("GET") {
+            warn!(host = %resolved_host, path = %path, "Retrying GET over Reticulum after transient stream error");
+            req_result = client
+                .request(&resolved_host, &method, &path, hdrs, body, req_timeout)
+                .await;
+        }
+        match req_result {
             Ok(resp) => {
-                if cacheable && resp.status == 200 {
+                let is_still_encoded = resp
+                    .headers
+                    .iter()
+                    .any(|(k, _)| k.eq_ignore_ascii_case("content-encoding"))
+                    || resp.body.starts_with(&[0x1f, 0x8b]);
+                if cacheable && resp.status == 200 && !is_still_encoded {
                     let put_host = resolved_host.clone();
                     let put_path = path.clone();
                     let put_status = resp.status;
