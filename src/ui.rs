@@ -200,6 +200,9 @@ pub const HOME_HTML: &str = r##"<!DOCTYPE html>
         <span class="mono" style="padding:4px 10px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:0.06em;background:rgba(56,189,248,0.14);border:1px solid rgba(56,189,248,0.5);color:#7dd3fc;">{{BIFROST_SHORT_TAG}}</span>
       </div>
       <div class="tagline mono">ZERO-IP GHOST BROWSER · POWERED BY RETICULUM · 0 COOKIES · 0 DNS</div>
+      <div class="mono" style="max-width:780px;margin:8px auto 0;padding:7px 14px;border-radius:10px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.28);color:#a7f3d0;font-size:11px;line-height:1.45;">
+        🔒 <strong>Encryption:</strong> Every link is end-to-end encrypted with <strong>512-bit Curve25519</strong> (<strong>X25519</strong> ephemeral key exchange + <strong>Ed25519</strong> signatures) and <strong>AES-256-CBC + HMAC-SHA256</strong> over Reticulum — zero TLS CAs, zero DNS, zero open server ports.
+      </div>
       <button type="button" class="new-chat-btn mono" onclick="resetChat()">✦ NEW CHAT</button>
     </div>
 
