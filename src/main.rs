@@ -991,7 +991,7 @@ fn spawn_mesh_handler(
 
         // Live In-Process Reticulum Fetch -> 0-Port Ghost Linux Server
         match client
-            .request(&resolved_host, &method, &path, hdrs, body, Duration::from_secs(25))
+            .request(&resolved_host, &method, &path, hdrs, body, Duration::from_secs(60))
             .await
         {
             Ok(resp) => {
