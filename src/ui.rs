@@ -487,7 +487,7 @@ async function handleOmnibox(e) {
     parseInviteCardInput();
     return;
   }
-  if (uri) { window.location.href = uri; return; }
+  if (uri) { if (window.__bifrostShowTransit) window.__bifrostShowTransit(uri); window.location.href = uri; return; }
 
   input.value = '';
   appendMessage('user', raw);
@@ -1013,7 +1013,7 @@ setInterval(refreshPeers, 3000);
 </html>
 "##;
 
-pub const HUD_INIT_SCRIPT: &str = r#"
+pub const HUD_INIT_SCRIPT: &str = r##"
 (function() {
   function ensureStorage(name) {
     try {
@@ -1038,8 +1038,337 @@ pub const HUD_INIT_SCRIPT: &str = r#"
 
   if (window.__bifrostHudMounted) return;
   if (window.location.protocol !== 'bifrost:' && window.location.protocol !== 'citadel:' && window.location.protocol !== 'ironpass:') return;
-  if ((window.location.protocol === 'bifrost:' || window.location.protocol === 'citadel:') && window.location.hostname === 'home') return;
   window.__bifrostHudMounted = true;
+
+  const isHomePage = (window.location.protocol === 'bifrost:' || window.location.protocol === 'citadel:') && window.location.hostname === 'home';
+
+  // === BIFROST Animated Reticulum Encryption Transit & Live Asset Stream Overlay ===
+  const activeStreams = new Map();
+  let streamSeq = 0;
+  let navTransitActive = false;
+  let overlayVisible = false;
+  let overlayMode = 'modal';
+  let overlayTarget = window.location.href;
+  let overlayStart = Date.now();
+  let showTimer = null;
+  let hideTimer = null;
+  let tickerTimer = null;
+  let userDismissed = false;
+  let pageBootDone = document.readyState === 'complete';
+  let cacheToastTimer = null;
+
+  function shortTargetLabel(raw) {
+    const s = String(raw || '').trim();
+    if (s.length > 52) return s.slice(0, 26) + '…' + s.slice(-18);
+    return s || 'Reticulum Ghost Vault';
+  }
+
+  function cleanAssetName(url) {
+    try {
+      const u = String(url || '').split('?')[0].split('#')[0];
+      const parts = u.split('/').filter(Boolean);
+      return parts.length ? parts[parts.length - 1] : u;
+    } catch (_) {
+      return 'encrypted-stream';
+    }
+  }
+
+  function shouldTrackUrl(url) {
+    const s = String(url || '');
+    if (!s || s.startsWith('data:') || s.startsWith('blob:')) return false;
+    if (isHomePage && (s.startsWith('/api/') || s.includes('home/api/'))) return false;
+    if (s.includes('/api/peers') || s.includes('/__bifrost_rns/peers') || s.includes('/cam/')) return false;
+    return true;
+  }
+
+  function injectLoaderStyles() {
+    if (document.getElementById('__bf_rns_loader_css')) return;
+    const st = document.createElement('style');
+    st.id = '__bf_rns_loader_css';
+    st.textContent = `
+      @keyframes __bfSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+      @keyframes __bfPulse { 0%,100% { opacity: .45; transform: scale(.96); } 50% { opacity: 1; transform: scale(1.05); } }
+      @keyframes __bfFlow { 0% { stroke-dashoffset: 64; } 100% { stroke-dashoffset: 0; } }
+      @keyframes __bfShimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(260%); } }
+      @keyframes __bfFadeIn { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+      #__bf_rns_overlay {
+        position: fixed; z-index: 2147483646; pointer-events: none;
+        font-family: ui-monospace, 'JetBrains Mono', SFMono-Regular, Menlo, monospace;
+        color: #ecfdf5; transition: opacity .28s ease, transform .28s ease;
+        opacity: 0; display: none;
+      }
+      #__bf_rns_overlay.visible { display: flex; opacity: 1; }
+      #__bf_rns_overlay.mode-modal {
+        inset: 34px 0 0 0; align-items: center; justify-content: center;
+        background: radial-gradient(circle at 50% 40%, rgba(4, 24, 16, 0.86), rgba(2, 6, 4, 0.92));
+        backdrop-filter: blur(8px); pointer-events: auto;
+      }
+      #__bf_rns_overlay.mode-dock { right: 16px; bottom: 16px; width: min(410px, calc(100vw - 32px)); pointer-events: auto; }
+      .__bf_card {
+        width: 100%; max-width: 500px;
+        background: linear-gradient(160deg, rgba(5, 16, 11, 0.97), rgba(3, 10, 14, 0.97));
+        border: 1px solid rgba(56, 189, 248, 0.45); border-radius: 14px; padding: 16px 18px;
+        box-shadow: 0 18px 54px rgba(0, 0, 0, 0.72), 0 0 28px rgba(16, 185, 129, 0.16);
+        animation: __bfFadeIn .22s ease-out;
+      }
+      #__bf_rns_overlay.mode-dock .__bf_card { padding: 13px 15px; border-color: rgba(132, 204, 22, 0.48); }
+      .__bf_head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+      .__bf_title { font-size: 11.5px; font-weight: 800; letter-spacing: .08em; color: #bef264; display: flex; align-items: center; gap: 7px; }
+      .__bf_dot { width: 8px; height: 8px; border-radius: 50%; background: #38bdf8; box-shadow: 0 0 10px #38bdf8; animation: __bfPulse 1.1s infinite ease-in-out; }
+      .__bf_meta { display: flex; align-items: center; gap: 8px; font-size: 10.5px; color: #7dd3fc; }
+      .__bf_close { background: rgba(148,163,184,0.12); border: 1px solid rgba(148,163,184,0.28); color: #cbd5e1; border-radius: 6px; padding: 2px 7px; font-size: 10px; cursor: pointer; font-family: inherit; }
+      .__bf_close:hover { background: rgba(248,113,113,0.2); color: #fecaca; border-color: rgba(248,113,113,0.45); }
+      .__bf_target { font-size: 11px; color: #e0f2fe; background: rgba(2, 8, 5, 0.85); border: 1px solid rgba(56, 189, 248, 0.28); border-radius: 8px; padding: 5px 9px; margin-bottom: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .__bf_bridge { width: 100%; height: 68px; display: block; margin-bottom: 10px; }
+      .__bf_steps { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; font-size: 10.5px; }
+      .__bf_step { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 8px; border-radius: 7px; background: rgba(2, 9, 6, 0.72); border: 1px solid rgba(148, 198, 168, 0.14); }
+      .__bf_step.done { color: #a7f3d0; border-color: rgba(16, 185, 129, 0.30); }
+      .__bf_step.active { color: #e0f2fe; border-color: rgba(56, 189, 248, 0.45); background: rgba(8, 30, 42, 0.48); }
+      .__bf_bar_wrap { height: 5px; border-radius: 999px; background: rgba(15, 23, 42, 0.9); overflow: hidden; border: 1px solid rgba(56,189,248,0.25); margin-bottom: 8px; }
+      .__bf_bar_fill { width: 42%; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #10b981, #38bdf8, #84cc16); animation: __bfShimmer 1.35s infinite linear; }
+      .__bf_cipher { font-size: 9.5px; color: #6ee7b7; opacity: .82; display: flex; justify-content: space-between; gap: 8px; overflow: hidden; white-space: nowrap; }
+      #__bf_cache_toast { position: fixed; top: 42px; right: 14px; z-index: 2147483646; padding: 5px 11px; border-radius: 999px; background: rgba(4, 24, 14, 0.94); border: 1px solid rgba(132, 204, 22, 0.55); color: #bef264; font-family: ui-monospace, Menlo, monospace; font-size: 10.5px; font-weight: 800; box-shadow: 0 6px 20px rgba(0,0,0,0.5); pointer-events: none; opacity: 0; transition: opacity .22s ease; }
+      #__bf_cache_toast.show { opacity: 1; }
+    `;
+    (document.head || document.documentElement).appendChild(st);
+  }
+
+  function ensureOverlayEl() {
+    if (!document.body) return null;
+    injectLoaderStyles();
+    let el = document.getElementById('__bf_rns_overlay');
+    if (el) return el;
+    el = document.createElement('div');
+    el.id = '__bf_rns_overlay';
+    el.innerHTML = `
+      <div class="__bf_card">
+        <div class="__bf_head">
+          <div class="__bf_title"><span class="__bf_dot"></span><span>ᛉ BIFROST // RETICULUM ENCRYPTED TUNNEL</span></div>
+          <div class="__bf_meta">
+            <span id="__bf_rns_elapsed">0.0s</span>
+            <button type="button" class="__bf_close" id="__bf_rns_hide">✕</button>
+          </div>
+        </div>
+        <div class="__bf_target" id="__bf_rns_target">Resolving 128-bit Reticulum destination…</div>
+        <svg class="__bf_bridge" viewBox="0 0 460 68" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="__bfGrad" x1="0" y1="0" x2="460" y2="0" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#84cc16"/>
+              <stop offset="50%" stop-color="#38bdf8"/>
+              <stop offset="100%" stop-color="#10b981"/>
+            </linearGradient>
+          </defs>
+          <path d="M 88 34 Q 160 12 230 34 T 372 34" stroke="rgba(56,189,248,0.22)" stroke-width="3" fill="none"/>
+          <path d="M 88 34 Q 160 12 230 34 T 372 34" stroke="url(#__bfGrad)" stroke-width="2.5" stroke-dasharray="10 6" style="animation:__bfFlow 0.85s linear infinite;" fill="none"/>
+          <path d="M 88 34 Q 160 56 230 34 T 372 34" stroke="rgba(132,204,22,0.22)" stroke-width="2" stroke-dasharray="6 10" style="animation:__bfFlow 1.25s linear infinite reverse;" fill="none"/>
+          <circle r="4" fill="#bef264"><animateMotion dur="1.15s" repeatCount="indefinite" path="M 88 34 Q 160 12 230 34 T 372 34"/></circle>
+          <circle r="3.5" fill="#38bdf8"><animateMotion dur="1.15s" begin="0.38s" repeatCount="indefinite" path="M 88 34 Q 160 12 230 34 T 372 34"/></circle>
+          <circle r="3" fill="#34d399"><animateMotion dur="1.45s" begin="0.2s" repeatCount="indefinite" path="M 372 34 Q 300 56 230 34 T 88 34"/></circle>
+          <rect x="6" y="14" width="84" height="40" rx="9" fill="#06140d" stroke="#84cc16" stroke-width="1.3"/>
+          <text x="48" y="31" text-anchor="middle" fill="#bef264" font-size="8.5" font-weight="800" font-family="ui-monospace,monospace">WORKSTATION</text>
+          <text x="48" y="44" text-anchor="middle" fill="#7ea18d" font-size="7.5" font-family="ui-monospace,monospace">0 HTTP PORTS</text>
+          <g transform="translate(230,34)">
+            <circle r="21" fill="#04151e" stroke="#38bdf8" stroke-width="1.3"/>
+            <circle r="26" fill="none" stroke="#84cc16" stroke-width="1" stroke-dasharray="5 5" style="transform-origin:0 0;animation:__bfSpin 5s linear infinite;"/>
+            <text x="0" y="-2" text-anchor="middle" fill="#7dd3fc" font-size="8" font-weight="800" font-family="ui-monospace,monospace">X25519</text>
+            <text x="0" y="9" text-anchor="middle" fill="#bef264" font-size="7.5" font-weight="800" font-family="ui-monospace,monospace">AES-256</text>
+          </g>
+          <rect x="370" y="14" width="84" height="40" rx="9" fill="#06140d" stroke="#10b981" stroke-width="1.3"/>
+          <text x="412" y="31" text-anchor="middle" fill="#6ee7b7" font-size="8.5" font-weight="800" font-family="ui-monospace,monospace">GHOST VAULT</text>
+          <text x="412" y="44" text-anchor="middle" fill="#7ea18d" font-size="7.5" font-family="ui-monospace,monospace">0 OPEN PORTS</text>
+        </svg>
+        <div class="__bf_steps">
+          <div class="__bf_step done"><span>✓ 01 · ZERO-DNS 128-BIT HASH</span><span>VERIFIED</span></div>
+          <div class="__bf_step done"><span>✓ 02 · 512-BIT CURVE25519 LINK</span><span>X25519 + Ed25519</span></div>
+          <div class="__bf_step active"><span id="__bf_rns_step3">⚡ 03 · STREAMING ENCRYPTED CHT2 CHUNKS…</span><span id="__bf_rns_badge">LIVE</span></div>
+        </div>
+        <div class="__bf_bar_wrap"><div class="__bf_bar_fill"></div></div>
+        <div class="__bf_cipher">
+          <span id="__bf_rns_hex">CHT2 AES-256-CBC · HMAC-SHA256</span>
+          <span>0 DNS · 0 TLS CAs</span>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(el);
+    const hideBtn = document.getElementById('__bf_rns_hide');
+    if (hideBtn) hideBtn.onclick = () => { userDismissed = true; hideOverlayImmediate(); };
+    return el;
+  }
+
+  function flashCacheToast(label) {
+    if (!document.body) return;
+    injectLoaderStyles();
+    let t = document.getElementById('__bf_cache_toast');
+    if (!t) { t = document.createElement('div'); t.id = '__bf_cache_toast'; document.body.appendChild(t); }
+    t.textContent = `💾 ENCRYPTED CACHE HIT · ${label}`;
+    t.classList.add('show');
+    if (cacheToastTimer) clearTimeout(cacheToastTimer);
+    cacheToastTimer = setTimeout(() => { t.classList.remove('show'); }, 1500);
+  }
+
+  function randCipherHex() {
+    const h = '0123456789abcdef';
+    let out = '0x';
+    for (let i = 0; i < 16; i++) out += h[(Math.random() * 16) | 0];
+    return out;
+  }
+
+  function renderOverlayContent() {
+    const el = ensureOverlayEl();
+    if (!el) return;
+    const elapsed = ((Date.now() - overlayStart) / 1000).toFixed(1);
+    const elEl = document.getElementById('__bf_rns_elapsed');
+    const tgtEl = document.getElementById('__bf_rns_target');
+    const step3 = document.getElementById('__bf_rns_step3');
+    const badge = document.getElementById('__bf_rns_badge');
+    const hexEl = document.getElementById('__bf_rns_hex');
+    if (elEl) elEl.textContent = `${elapsed}s`;
+    if (tgtEl) tgtEl.textContent = shortTargetLabel(overlayTarget);
+    const items = Array.from(activeStreams.values());
+    if (navTransitActive) {
+      if (step3) step3.textContent = '⚡ 03 · NEGOTIATING ENCRYPTED RETICULUM PAYLOAD…';
+      if (badge) badge.textContent = 'TRANSIT';
+    } else if (items.length > 0) {
+      const extra = items.length > 1 ? ` (+${items.length - 1} queued)` : '';
+      if (step3) step3.textContent = `⚡ 03 · STREAMING ${items[0].label}${extra}`;
+      if (badge) badge.textContent = `${items.length} ACTIVE`;
+    } else if (!pageBootDone) {
+      if (step3) step3.textContent = '⚡ 03 · DECRYPTING SOVEREIGN APP BUNDLE…';
+      if (badge) badge.textContent = 'LOADING';
+    }
+    if (hexEl) hexEl.textContent = `CHT2 ${randCipherHex()} · AES-256-CBC + HMAC`;
+  }
+
+  function showOverlay(mode, target) {
+    if (userDismissed && !navTransitActive) return;
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+    overlayMode = mode;
+    if (target) overlayTarget = target;
+    if (!overlayVisible) overlayStart = Date.now();
+    const el = ensureOverlayEl();
+    if (!el) return;
+    el.className = `visible mode-${overlayMode}`;
+    overlayVisible = true;
+    renderOverlayContent();
+    if (!tickerTimer) tickerTimer = setInterval(renderOverlayContent, 160);
+  }
+
+  function hideOverlayImmediate() {
+    if (showTimer) { clearTimeout(showTimer); showTimer = null; }
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+    if (tickerTimer) { clearInterval(tickerTimer); tickerTimer = null; }
+    overlayVisible = false;
+    const el = document.getElementById('__bf_rns_overlay');
+    if (el) el.className = '';
+  }
+
+  function scheduleOverlayUpdate() {
+    if (navTransitActive) { showOverlay('modal', overlayTarget); return; }
+    const busy = activeStreams.size > 0 || (!isHomePage && !pageBootDone);
+    if (busy) {
+      if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+      if (!overlayVisible && !showTimer && !userDismissed) {
+        const mode = pageBootDone ? 'dock' : 'modal';
+        showTimer = setTimeout(() => {
+          showTimer = null;
+          if (activeStreams.size > 0 || (!isHomePage && !pageBootDone)) showOverlay(mode, window.location.href);
+        }, 260);
+      } else if (overlayVisible) {
+        renderOverlayContent();
+      }
+    } else {
+      if (showTimer) { clearTimeout(showTimer); showTimer = null; }
+      if (overlayVisible) {
+        const step3 = document.getElementById('__bf_rns_step3');
+        const badge = document.getElementById('__bf_rns_badge');
+        if (step3) step3.textContent = '✓ 03 · DECRYPTED & VERIFIED IN LOCAL RAM';
+        if (badge) badge.textContent = 'DONE';
+        if (hideTimer) clearTimeout(hideTimer);
+        hideTimer = setTimeout(() => { userDismissed = false; hideOverlayImmediate(); }, 380);
+      }
+    }
+  }
+
+  function beginTransit(url) {
+    if (!url || !/^(bifrost|citadel|ironpass):\/\//i.test(url)) return;
+    if (/^(bifrost|citadel):\/\/home\/?$/i.test(url)) return;
+    userDismissed = false;
+    navTransitActive = true;
+    overlayTarget = url;
+    overlayStart = Date.now();
+    showOverlay('modal', url);
+  }
+  window.__bifrostShowTransit = beginTransit;
+
+  if (typeof window.fetch === 'function') {
+    const origFetch = window.fetch.bind(window);
+    window.fetch = function(input, init) {
+      const url = typeof input === 'string' ? input : (input && input.url) || '';
+      if (!shouldTrackUrl(url)) return origFetch(input, init);
+      const id = ++streamSeq;
+      const label = cleanAssetName(url);
+      activeStreams.set(id, { label, startedAt: Date.now() });
+      scheduleOverlayUpdate();
+      return origFetch(input, init).then((resp) => {
+        try {
+          if (resp && resp.headers && resp.headers.get('x-bifrost-cache') === 'HIT-ENC') {
+            if (/\.(glb|gltf|obj|stl|js|wasm)$/i.test(label)) flashCacheToast(label);
+          }
+        } catch (_) {}
+        activeStreams.delete(id);
+        scheduleOverlayUpdate();
+        return resp;
+      }, (err) => {
+        activeStreams.delete(id);
+        scheduleOverlayUpdate();
+        throw err;
+      });
+    };
+  }
+
+  if (typeof window.XMLHttpRequest === 'function') {
+    const origOpen = XMLHttpRequest.prototype.open;
+    const origSend = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.open = function(method, url) {
+      this.__bfUrl = typeof url === 'string' ? url : String(url || '');
+      return origOpen.apply(this, arguments);
+    };
+    XMLHttpRequest.prototype.send = function() {
+      const url = this.__bfUrl || '';
+      if (shouldTrackUrl(url)) {
+        const id = ++streamSeq;
+        const label = cleanAssetName(url);
+        activeStreams.set(id, { label, startedAt: Date.now() });
+        scheduleOverlayUpdate();
+        this.addEventListener('loadend', () => {
+          try {
+            if (this.getResponseHeader && this.getResponseHeader('x-bifrost-cache') === 'HIT-ENC') {
+              if (/\.(glb|gltf|obj|stl|js|wasm)$/i.test(label)) flashCacheToast(label);
+            }
+          } catch (_) {}
+          activeStreams.delete(id);
+          scheduleOverlayUpdate();
+        }, { once: true });
+      }
+      return origSend.apply(this, arguments);
+    };
+  }
+
+  document.addEventListener('click', (ev) => {
+    const a = ev.target && ev.target.closest ? ev.target.closest('a[href]') : null;
+    if (!a) return;
+    const href = a.getAttribute('href') || '';
+    if (/^(bifrost|citadel|ironpass):\/\//i.test(href)) beginTransit(href);
+  }, true);
+
+  window.addEventListener('pageshow', () => {
+    navTransitActive = false;
+    if (document.readyState === 'complete') { pageBootDone = true; scheduleOverlayUpdate(); }
+  });
+  window.addEventListener('load', () => { pageBootDone = true; navTransitActive = false; scheduleOverlayUpdate(); });
+
+  if (!isHomePage && !pageBootDone) scheduleOverlayUpdate();
+  if (isHomePage) return;
 
   function mountHud() {
     if (!document.body || document.getElementById('__bifrost_ghost_hud')) return;
@@ -1072,15 +1401,15 @@ pub const HUD_INIT_SCRIPT: &str = r#"
         const hybrid = v.match(/#ip=([^\s]+)/i);
         if (hybrid && hybrid[1]) v = 'ironpass://' + hybrid[1].replace(/^\/+/, '');
         else if (v && !v.includes('://')) v = 'bifrost://' + v;
-        if (v) window.location.href = v;
+        if (v) { beginTransit(v); window.location.href = v; }
       }
     });
     document.getElementById('__bf_home').onclick = () => { window.location.href = 'bifrost://home/'; };
     document.getElementById('__bf_back').onclick = () => window.history.back();
-    document.getElementById('__bf_reload').onclick = () => window.location.reload();
+    document.getElementById('__bf_reload').onclick = () => { beginTransit(window.location.href); window.location.reload(); };
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountHud);
   else mountHud();
 })();
-"#;
+"##;

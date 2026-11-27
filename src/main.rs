@@ -1015,6 +1015,7 @@ fn spawn_mesh_handler(
                 let mut builder = Response::builder()
                     .status(st)
                     .header("Access-Control-Allow-Origin", "*")
+                    .header("Access-Control-Expose-Headers", "x-bifrost-transport, x-bifrost-cache")
                     .header("x-bifrost-transport", "encrypted-local-cache")
                     .header("x-bifrost-cache", "HIT-ENC");
                 let mut has_ct = false;
@@ -1038,8 +1039,9 @@ fn spawn_mesh_handler(
         }
 
         // Live In-Process Reticulum Fetch -> 0-Port Ghost Linux Server
+        let req_timeout = if cacheable { Duration::from_secs(120) } else { Duration::from_secs(60) };
         match client
-            .request(&resolved_host, &method, &path, hdrs, body, Duration::from_secs(60))
+            .request(&resolved_host, &method, &path, hdrs, body, req_timeout)
             .await
         {
             Ok(resp) => {
@@ -1062,6 +1064,7 @@ fn spawn_mesh_handler(
                 let mut builder = Response::builder()
                     .status(st)
                     .header("Access-Control-Allow-Origin", "*")
+                    .header("Access-Control-Expose-Headers", "x-bifrost-transport, x-bifrost-cache")
                     .header("x-bifrost-transport", "reticulum-rs-mit-inprocess")
                     .header("x-bifrost-cache", if cacheable { "MISS-STORED" } else { "BYPASS" });
                 let mut has_ct = false;
