@@ -2,7 +2,7 @@
 
 > **What cannot be seen cannot be attacked.**
 >
-> **BIFROST** is the 100% sovereign, zero-IP Ghost Realm — a new way of computing and running local agentic AI with **no cloud, no DNS, no public IP addresses, and zero open server ports**. Powered by heavy end-to-end encryption over **Reticulum**, BIFROST complements **ASGAARD** wherever absolute discretion, invisibility, and off-grid resilience matter most — starting on a palm-sized **Ventuno Q (40 TOPS NPU)** and scaling seamlessly to **32 GB VRAM NVIDIA Ubuntu Linux servers**, **128 GB NVIDIA DGX Spark** enclaves, and beyond — on hardware you own.
+> **BIFROST** is the 100% sovereign, zero-IP Ghost Realm — a new way of computing and running local agentic AI with **no cloud, no DNS, no public IP addresses, and zero open server ports**. Powered by heavy end-to-end encryption over **Reticulum**, BIFROST complements **ASGAARD** wherever absolute discretion, invisibility, and off-grid resilience matter most — starting on a palm-sized **Ventuno Q (40 TOPS NPU)** and scaling seamlessly to **MIMIR** local super-LLM servers (**32 GB VRAM NVIDIA Ubuntu Linux servers**, **128 GB NVIDIA DGX Spark** enclaves, and beyond) — on hardware you own.
 
 ---
 
@@ -20,8 +20,8 @@
 4. **Lean beats bloated. Every kilobyte is sacred.**
    BIFROST is not a second legacy OS. Apps inside the Ghost Realm are purpose-built, ultra-lean, native Reticulum tools with zero dead buttons and zero external dependencies — fast enough to cross a satellite link or survive off-grid.
 
-5. **Your silicon, your mind — from edge NPU to sovereign supercomputer.**
-   Intelligence inside BIFROST is always **100% local silicon**. It begins on an energy-efficient **Ventuno Q (40 TOPS Hexagon NPU)** and evolves effortlessly onto **NVIDIA Ubuntu Linux servers (32 GB VRAM)**, **NVIDIA DGX Spark (128 GB unified memory)**, and multi-GPU sovereign enclaves — without changing a single protocol or leaking a single prompt.
+5. **Your silicon, your mind — from edge NPU to MIMIR supercomputer.**
+   Intelligence inside BIFROST is always **100% local silicon**. It begins on an energy-efficient **Ventuno Q (40 TOPS Hexagon NPU)** and evolves effortlessly onto **MIMIR** sovereign super-LLM nodes (**32 GB VRAM NVIDIA Ubuntu Linux servers**, **128 GB NVIDIA DGX Spark** unified-memory enclaves, and multi-GPU racks) — without changing a single protocol or leaking a single prompt.
 
 6. **Two realms, one purpose — never a duplicate OS.**
    - **ASGAARD** is the expansive Sovereign Agentic AI Operating System for full enterprise studios, hybrid multi-LLM orchestration, and corporate GPU farms.
@@ -49,4 +49,4 @@ Before adding any feature, service, or app to **BIFROST**, ask four questions:
 1. **Does it work with 0 external internet, 0 DNS, and 0 cloud APIs?** *(If no → it belongs in **ASGAARD**, not BIFROST.)*
 2. **Is it lean and native to Reticulum (`400 B` packets, fast cold start, zero legacy Web2 bloat)?** *(If no → build a native Ghost app instead of porting a heavy Web2 bundle.)*
 3. **Does it preserve invisibility and zero-IP discretion?** *(If it requires open listening ports, tracking, or third-party cloud relays → reject it.)*
-4. **Does it scale cleanly across local silicon (Ventuno Q → 32 GB GPU Linux → 128 GB DGX Spark)?** *(If yes → build it.)*
+4. **Does it scale cleanly across local silicon (Ventuno Q → MIMIR 32 GB GPU Linux → MIMIR 128 GB DGX Spark)?** *(If yes → build it.)*

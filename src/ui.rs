@@ -376,7 +376,7 @@ pub const HOME_HTML: &str = r##"<!DOCTYPE html>
         <div class="mono" style="font-size:10.5px; font-weight:800; color:var(--lime); letter-spacing:0.1em;">THE MANTRA · NORTH STAR</div>
         <div style="font-size:14px; font-weight:800; color:#fff; line-height:1.45;">“What cannot be seen cannot be attacked.”</div>
         <div style="font-size:12px; color:#d4ebe0; line-height:1.6;">
-          <strong>BIFROST</strong> is the 100% sovereign, zero-IP Ghost Realm — a new way of computing and running local agentic AI with <strong>no cloud, no DNS, no public IP addresses, and zero open server ports</strong>. Powered by heavy end-to-end encryption over <strong>Reticulum</strong>, BIFROST complements <strong>ASGAARD</strong> wherever absolute discretion, invisibility, and off-grid resilience matter most — starting on a palm-sized <strong>Ventuno Q (40 TOPS NPU)</strong> and scaling seamlessly to <strong>32 GB VRAM NVIDIA Ubuntu Linux servers</strong>, <strong>128 GB NVIDIA DGX Spark</strong> enclaves, and beyond — on hardware you own.
+          <strong>BIFROST</strong> is the 100% sovereign, zero-IP Ghost Realm — a new way of computing and running local agentic AI with <strong>no cloud, no DNS, no public IP addresses, and zero open server ports</strong>. Powered by heavy end-to-end encryption over <strong>Reticulum</strong>, BIFROST complements <strong>ASGAARD</strong> wherever absolute discretion, invisibility, and off-grid resilience matter most — starting on a palm-sized <strong>Ventuno Q (40 TOPS NPU)</strong> and scaling seamlessly to <strong>MIMIR</strong> local super-LLM servers (<strong>32 GB VRAM NVIDIA Ubuntu Linux</strong>, <strong>128 GB NVIDIA DGX Spark</strong> enclaves, and beyond) — on hardware you own.
         </div>
       </div>
       <div class="peer-card" style="border-color:rgba(56,189,248,0.35); gap:10px;">
@@ -386,7 +386,7 @@ pub const HOME_HTML: &str = r##"<!DOCTYPE html>
           <li><strong>Cross the bridge; leave the old world behind.</strong> Zero cookies, zero trackers, zero cloud decryption. End-to-end <strong>512-bit Curve25519 (X25519 + Ed25519)</strong>, <strong>AES-256-CBC + HMAC-SHA256</strong>, IFAC masking, and mutual Ed25519 hardware auth.</li>
           <li><strong>Zero trust in the wire — total freedom of transport.</strong> Fiber, Starlink, 5G, and Wi-Fi are untrusted pipes; out-of-band <strong>Sub-GHz LoRa</strong> carries emergency C2, telemetry, and offline DPPs when broadband goes dark.</li>
           <li><strong>Lean beats bloated. Every kilobyte is sacred.</strong> BIFROST is not a second legacy OS. Native Reticulum Ghost apps stay ultra-lean, zero-bloat, and fast across any link.</li>
-          <li><strong>Your silicon, your mind.</strong> 100% local AI — starting on <strong>Ventuno Q (40 TOPS NPU)</strong> and scaling cleanly to <strong>32 GB NVIDIA Ubuntu servers</strong> and <strong>128 GB NVIDIA DGX Spark</strong> enclaves.</li>
+          <li><strong>Your silicon, your mind.</strong> 100% local AI — starting on <strong>Ventuno Q (40 TOPS NPU)</strong> and scaling cleanly to <strong>MIMIR</strong> super-LLM servers (<strong>32 GB NVIDIA Ubuntu</strong> &amp; <strong>128 GB NVIDIA DGX Spark</strong>).</li>
           <li><strong>Two realms, one purpose — never a duplicate OS.</strong> <strong>ASGAARD</strong> powers broad enterprise/GPU-farm studios; <strong>BIFROST</strong> is the lean, off-grid Ghost Realm; <strong>CITADEL</strong> is the 0-port Linux fabric; <strong>IRONPASS</strong> is physical/cryptographic proof.</li>
           <li><strong>Identity belongs to hardware, not passwords.</strong> Persistent <strong>Ed25519 device keys</strong> and physical <strong>NTAG 424 DNA / Hybrid #ip=</strong> tags replace fragile Web2 logins.</li>
           <li><strong>Open wire, clean-room craft, honest engineering.</strong> Clean-room MIT Rust &amp; C++ over the public-domain Reticulum Wire Protocol (credit to inventor <strong>Mark Qvist</strong>) — strictly defensive and sovereign.</li>
@@ -400,7 +400,7 @@ pub const HOME_HTML: &str = r##"<!DOCTYPE html>
           1. Works with 0 internet, 0 DNS, 0 cloud APIs?<br/>
           2. Lean &amp; native to Reticulum (400 B packets, zero Web2 bloat)?<br/>
           3. Preserves invisibility &amp; zero-IP discretion (0 open ports)?<br/>
-          4. Scales across local silicon (Ventuno Q → 32 GB GPU → 128 GB DGX Spark)?
+          4. Scales across local silicon (Ventuno Q → MIMIR 32 GB GPU → MIMIR 128 GB DGX Spark)?
         </div>
       </div>
     </aside>
