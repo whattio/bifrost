@@ -202,6 +202,7 @@ pub const HOME_HTML: &str = r##"<!DOCTYPE html>
       <span class="status-chip" style="border-color:rgba(56,189,248,0.48);background:rgba(56,189,248,0.12);color:#bae6fd;" title="Synced with GitHub Cargo.toml + Git commit SHA">{{BIFROST_BUILD_TAG}}</span>
     </div>
     <div class="top-right">
+      <button type="button" class="top-btn mono" onclick="openZen()" style="border-color:rgba(56,189,248,0.5);color:#7dd3fc;" title="Read The Zen of BIFROST — Mantra & Manifesto">ᛉ ZEN</button>
       <button type="button" class="top-btn mono" id="think-toggle" onclick="toggleThinking()">🧠 THINK: OFF</button>
       <button type="button" class="top-btn mono" onclick="openQrScanner()" style="border-color:rgba(132,204,22,0.55);color:#bef264;">📷 SCAN QR</button>
       <button type="button" class="top-btn mono" id="contacts-btn" onclick="openContacts()" title="Local Sovereign Contact Book (~/.config/bifrost/contacts.json · 0 DNS)">📒 CONTACTS (0)</button>
@@ -361,6 +362,46 @@ pub const HOME_HTML: &str = r##"<!DOCTYPE html>
           <input id="qr-manual-input" class="mono" placeholder="Scan with USB reader or paste https://...#ip=..." style="flex:1; background:rgba(2,8,5,0.92); border:1px solid var(--border); color:#fff; border-radius:8px; padding:7px 9px; font-size:11px; outline:none;" />
           <button type="submit" class="btn-sm mono">GO →</button>
         </form>
+      </div>
+    </aside>
+  </div>
+
+  <div class="drawer-backdrop" id="zen-backdrop" onclick="if(event.target===this) closeZen()">
+    <aside class="drawer">
+      <div class="drawer-head">
+        <h2 class="mono" style="font-size:15px;">ᛉ THE ZEN OF BIFROST</h2>
+        <button type="button" class="top-btn mono" onclick="closeZen()">✕ CLOSE</button>
+      </div>
+      <div class="peer-card" style="border-color:rgba(132,204,22,0.5); background:linear-gradient(150deg, rgba(16,185,129,0.12), rgba(56,189,248,0.08));">
+        <div class="mono" style="font-size:10.5px; font-weight:800; color:var(--lime); letter-spacing:0.1em;">THE MANTRA · NORTH STAR</div>
+        <div style="font-size:14px; font-weight:800; color:#fff; line-height:1.45;">“What cannot be seen cannot be attacked.”</div>
+        <div style="font-size:12px; color:#d4ebe0; line-height:1.6;">
+          <strong>BIFROST</strong> is the 100% sovereign, zero-IP Ghost Realm — a new way of computing and running local agentic AI with <strong>no cloud, no DNS, no public IP addresses, and zero open server ports</strong>. Powered by heavy end-to-end encryption over <strong>Reticulum</strong>, BIFROST complements <strong>ASGAARD</strong> wherever absolute discretion, invisibility, and off-grid resilience matter most — starting on a palm-sized <strong>Ventuno Q (40 TOPS NPU)</strong> and scaling seamlessly to <strong>32 GB VRAM NVIDIA Ubuntu Linux servers</strong>, <strong>128 GB NVIDIA DGX Spark</strong> enclaves, and beyond — on hardware you own.
+        </div>
+      </div>
+      <div class="peer-card" style="border-color:rgba(56,189,248,0.35); gap:10px;">
+        <div class="mono" style="font-size:10.5px; font-weight:800; color:#7dd3fc; letter-spacing:0.08em;">TEN PRINCIPLES OF THE GHOST REALM</div>
+        <ol style="padding-left:18px; display:flex; flex-direction:column; gap:8px; font-size:12px; color:#d4e8dc; line-height:1.55;">
+          <li><strong>Invisibility is the highest form of defense.</strong> Reachable means attackable. Eliminating public IPs, DNS, TLS CAs, and open ports removes the target before a scanner can knock.</li>
+          <li><strong>Cross the bridge; leave the old world behind.</strong> Zero cookies, zero trackers, zero cloud decryption. End-to-end <strong>512-bit Curve25519 (X25519 + Ed25519)</strong>, <strong>AES-256-CBC + HMAC-SHA256</strong>, IFAC masking, and mutual Ed25519 hardware auth.</li>
+          <li><strong>Zero trust in the wire — total freedom of transport.</strong> Fiber, Starlink, 5G, and Wi-Fi are untrusted pipes; out-of-band <strong>Sub-GHz LoRa</strong> carries emergency C2, telemetry, and offline DPPs when broadband goes dark.</li>
+          <li><strong>Lean beats bloated. Every kilobyte is sacred.</strong> BIFROST is not a second legacy OS. Native Reticulum Ghost apps stay ultra-lean, zero-bloat, and fast across any link.</li>
+          <li><strong>Your silicon, your mind.</strong> 100% local AI — starting on <strong>Ventuno Q (40 TOPS NPU)</strong> and scaling cleanly to <strong>32 GB NVIDIA Ubuntu servers</strong> and <strong>128 GB NVIDIA DGX Spark</strong> enclaves.</li>
+          <li><strong>Two realms, one purpose — never a duplicate OS.</strong> <strong>ASGAARD</strong> powers broad enterprise/GPU-farm studios; <strong>BIFROST</strong> is the lean, off-grid Ghost Realm; <strong>CITADEL</strong> is the 0-port Linux fabric; <strong>IRONPASS</strong> is physical/cryptographic proof.</li>
+          <li><strong>Identity belongs to hardware, not passwords.</strong> Persistent <strong>Ed25519 device keys</strong> and physical <strong>NTAG 424 DNA / Hybrid #ip=</strong> tags replace fragile Web2 logins.</li>
+          <li><strong>Open wire, clean-room craft, honest engineering.</strong> Clean-room MIT Rust &amp; C++ over the public-domain Reticulum Wire Protocol (credit to inventor <strong>Mark Qvist</strong>) — strictly defensive and sovereign.</li>
+          <li><strong>Ephemeral on the client, sovereign in the enclave.</strong> RAM-only incognito workstations + encrypted static cache; persistent truth stays inside your 0-port Linux enclaves.</li>
+          <li><strong>Guided by curiosity, imagination, and craft.</strong> Exploring what computing becomes when privacy, autonomy, and local AI are the default laws of physics.</li>
+        </ol>
+      </div>
+      <div class="peer-card" style="border-color:rgba(245,158,11,0.38);">
+        <div class="mono" style="font-size:10.5px; font-weight:800; color:#fcd34d; letter-spacing:0.08em;">THE 4-QUESTION DECISION FILTER</div>
+        <div class="mono" style="font-size:11px; color:#d4e8dc; line-height:1.6;">
+          1. Works with 0 internet, 0 DNS, 0 cloud APIs?<br/>
+          2. Lean &amp; native to Reticulum (400 B packets, zero Web2 bloat)?<br/>
+          3. Preserves invisibility &amp; zero-IP discretion (0 open ports)?<br/>
+          4. Scales across local silicon (Ventuno Q → 32 GB GPU → 128 GB DGX Spark)?
+        </div>
       </div>
     </aside>
   </div>
@@ -532,6 +573,8 @@ async function handleOmnibox(e) {
   }
 }
 
+function openZen() { document.getElementById('zen-backdrop').classList.add('open'); }
+function closeZen() { document.getElementById('zen-backdrop').classList.remove('open'); }
 function openDrawer() { document.getElementById('drawer-backdrop').classList.add('open'); refreshPeers(); }
 function closeDrawer() { document.getElementById('drawer-backdrop').classList.remove('open'); }
 

@@ -10,6 +10,9 @@
 <p align="center">
   <code>v0.3.5-preview (Experimental Developer Preview)</code> &nbsp;·&nbsp; <code>bifrost://</code> &nbsp;·&nbsp; <code>ironpass://</code> &nbsp;·&nbsp; <strong>0 Local HTTP Ports</strong> &nbsp;·&nbsp; <strong>IFAC + Ed25519 Mutual Auth</strong>
 </p>
+<p align="center">
+  <a href="./ZEN_OF_BIFROST.md"><strong>ᛉ Read THE ZEN OF BIFROST — Mantra, Manifesto &amp; Architectural Decision Filter</strong></a>
+</p>
 
 > [!NOTE]
 > **Scope & Status (`v0.3.5-preview` — Experimental Developer Preview):**
