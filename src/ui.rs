@@ -319,7 +319,7 @@ pub const HOME_HTML: &str = r##"<!DOCTYPE html>
       <button type="button" class="top-btn mono" onclick="openZen()" style="border-color:rgba(56,189,248,0.5);color:#7dd3fc;" title="Read The Zen of BIFROST — Mantra & Manifesto">ᛉ ZEN</button>
       <button type="button" class="top-btn mono" id="think-toggle" onclick="toggleThinking()">🧠 THINK: OFF</button>
       <button type="button" class="top-btn mono" onclick="openQrScanner()" style="border-color:rgba(132,204,22,0.55);color:#bef264;">📷 SCAN QR</button>
-      <button type="button" class="top-btn mono" id="contacts-btn" onclick="openContacts()" title="Local Sovereign Contact Book (~/.config/bifrost/contacts.json · 0 DNS)">📒 CONTACTS (0)</button>
+      <button type="button" class="top-btn mono" id="contacts-btn" onclick="openContacts()" style="border-color:rgba(132,204,22,0.5);color:#d9f99d;" title="Pair another BIFROST device (1-QR Realm sync) or view saved Ghost servers">⚡ PAIR DEVICE</button>
       <button type="button" class="top-btn mono" id="nodes-btn" onclick="openDrawer()">📡 NODES (0)</button>
     </div>
   </header>
@@ -438,35 +438,66 @@ pub const HOME_HTML: &str = r##"<!DOCTYPE html>
   <div class="drawer-backdrop" id="contacts-backdrop" onclick="if(event.target===this) closeContacts()">
     <aside class="drawer">
       <div class="drawer-head">
-        <h2 class="mono" style="font-size:15px;">📒 SOVEREIGN CONTACT BOOK</h2>
+        <h2 class="mono" style="font-size:15px;">⚡ PAIR DEVICE &amp; SAVED NODES</h2>
         <button type="button" class="top-btn mono" onclick="closeContacts()">✕ CLOSE</button>
       </div>
-      <div class="mono" style="font-size:11px; color:var(--muted);">
-        Zero-DNS local petnames stored on this device (<code>~/.config/bifrost/contacts.json</code>). Type <code>bifrost://&lt;petname&gt;/</code> or paste a <code>bifrost-card://</code> invite.
+
+      <div class="peer-card" style="border-color:rgba(132,204,22,0.52); background:linear-gradient(155deg, rgba(132,204,22,0.10), rgba(6,15,11,0.94)); align-items:center; text-align:center;">
+        <div class="mono" style="font-size:11px;font-weight:800;color:var(--lime);letter-spacing:0.06em;">📤 ADD A NEW BIFROST (5-SECOND SETUP)</div>
+        <div style="font-size:11.5px;color:#cfe4d7;line-height:1.45;">
+          Scan with <strong>📷 SCAN QR</strong> on any new Mac or Linux BIFROST — or click <strong>Copy Pair Link</strong> &amp; paste it into the Omnibox.
+        </div>
+        <div id="pair-qr-box" style="background:#fff;padding:10px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;min-width:220px;min-height:220px;box-shadow:0 8px 24px rgba(0,0,0,0.45);">
+          <span class="mono" style="color:#020805;font-size:11px;">Generating QR...</span>
+        </div>
+        <div id="pair-meta" class="mono" style="font-size:10.5px;color:#a7f3d0;">Loading relays, dock &amp; saved nodes...</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
+          <button type="button" class="btn-sm mono" id="copy-pair-btn" onclick="copyPairLink()">📋 COPY PAIR LINK</button>
+          <button type="button" class="btn-sm mono" style="background:rgba(56,189,248,0.14);color:#bae6fd;border-color:rgba(56,189,248,0.45);" onclick="loadPairBundle()">↻ REFRESH QR</button>
+        </div>
       </div>
+
       <div class="peer-card" style="border-color:rgba(56,189,248,0.42);">
+        <div class="mono" style="font-size:11px;font-weight:800;color:#7dd3fc;">📥 JOIN AN EXISTING BIFROST REALM</div>
+        <form onsubmit="event.preventDefault(); importPairLink();" style="display:flex;gap:6px;">
+          <input id="pair-import-input" class="mono" placeholder="Paste bifrost-pair://... link here" style="flex:1;background:rgba(2,8,5,0.92);border:1px solid var(--border);color:#fff;border-radius:8px;padding:7px 9px;font-size:11px;outline:none;" />
+          <button type="submit" class="btn-sm mono">⚡ JOIN</button>
+        </form>
+        <div id="pair-import-msg" class="mono" style="font-size:10.5px;color:var(--muted);">Imports relays, Ghost Dock apps &amp; saved nodes in one step.</div>
+      </div>
+
+      <div class="peer-card" style="border-color:rgba(148,198,168,0.28);">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
-          <div class="mono" style="font-size:11px;font-weight:800;color:#7dd3fc;">🔑 MY DEVICE ED25519 CLIENT ID (LOCK 2)</div>
+          <div class="mono" style="font-size:11px;font-weight:800;color:#bae6fd;">🔑 THIS DEVICE ACCESS KEY (LOCK 2)</div>
           <button type="button" class="btn-sm mono" id="copy-cid-btn" onclick="copyMyClientId()">📋 COPY ID</button>
         </div>
         <input id="my-client-id" class="hash-box mono" readonly value="loading..." onclick="this.select(); copyMyClientId();" style="width:100%;cursor:pointer;outline:none;" title="Click to select & copy your 32-hex Ed25519 Client ID" />
-        <div class="mono" style="font-size:10px;color:var(--muted);">Share this ID with a private vault owner (<code>allowed_clients.txt</code>) to authorize this device.</div>
+        <div class="mono" style="font-size:10px;color:var(--muted);">Security badge only (for unlocking private Lock 2 vaults — not a website address).</div>
       </div>
-      <div class="peer-card" style="border-color:rgba(132,204,22,0.38);">
-        <div class="mono" style="font-size:11px; font-weight:800; color:var(--lime);">＋ ADD CONTACT OR PASTE INVITE CARD</div>
-        <input id="cb-card" class="mono" placeholder="Paste bifrost-card://... or bifrost://<hash>/" oninput="parseInviteCardInput()" style="background:rgba(2,8,5,0.92);border:1px solid var(--border);color:#fff;border-radius:8px;padding:7px 9px;font-size:11px;outline:none;" />
-        <div style="display:grid; grid-template-columns:1fr 1.4fr; gap:7px;">
-          <input id="cb-petname" class="mono" placeholder="petname (e.g. forge)" style="background:rgba(2,8,5,0.92);border:1px solid var(--border);color:#fff;border-radius:8px;padding:7px 9px;font-size:11.5px;outline:none;" />
-          <input id="cb-label" placeholder="Friendly label" style="background:rgba(2,8,5,0.92);border:1px solid var(--border);color:#fff;border-radius:8px;padding:7px 9px;font-size:11.5px;outline:none;" />
-        </div>
-        <input id="cb-hash" class="mono" placeholder="32-hex 128-bit Reticulum destination hash" style="background:rgba(2,8,5,0.92);border:1px solid var(--border);color:#bae6fd;border-radius:8px;padding:7px 9px;font-size:11px;outline:none;" />
-        <input id="cb-notes" placeholder="Notes (optional)" style="background:rgba(2,8,5,0.92);border:1px solid var(--border);color:#fff;border-radius:8px;padding:7px 9px;font-size:11px;outline:none;" />
-        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-          <span id="cb-msg" class="mono" style="font-size:10.5px; color:var(--muted);">Ready.</span>
-          <button type="button" class="btn-sm mono" onclick="saveContact()">💾 SAVE CONTACT</button>
-        </div>
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
+        <div class="mono" style="font-size:11px;font-weight:800;color:#d4e8dc;letter-spacing:0.06em;">★ SAVED GHOST SERVERS &amp; APPS</div>
+        <span class="mono" style="font-size:10px;color:var(--muted);">Type short name in Omnibox (0 DNS)</span>
       </div>
+
       <div id="contacts-list" style="display:flex; flex-direction:column; gap:10px;"></div>
+
+      <details id="manual-node-details" class="peer-card" style="border-color:rgba(148,198,168,0.22);">
+        <summary class="mono" style="font-size:11px; font-weight:800; color:var(--muted); cursor:pointer;">＋ Advanced: Add Server Hash Manually</summary>
+        <div style="display:flex;flex-direction:column;gap:8px;margin-top:10px;">
+          <input id="cb-card" class="mono" placeholder="Paste bifrost-card://... or bifrost://<hash>/" oninput="parseInviteCardInput()" style="background:rgba(2,8,5,0.92);border:1px solid var(--border);color:#fff;border-radius:8px;padding:7px 9px;font-size:11px;outline:none;" />
+          <div style="display:grid; grid-template-columns:1fr 1.4fr; gap:7px;">
+            <input id="cb-petname" class="mono" placeholder="short name (e.g. forge)" style="background:rgba(2,8,5,0.92);border:1px solid var(--border);color:#fff;border-radius:8px;padding:7px 9px;font-size:11.5px;outline:none;" />
+            <input id="cb-label" placeholder="Friendly label" style="background:rgba(2,8,5,0.92);border:1px solid var(--border);color:#fff;border-radius:8px;padding:7px 9px;font-size:11.5px;outline:none;" />
+          </div>
+          <input id="cb-hash" class="mono" placeholder="32-hex 128-bit Reticulum server destination hash" style="background:rgba(2,8,5,0.92);border:1px solid var(--border);color:#bae6fd;border-radius:8px;padding:7px 9px;font-size:11px;outline:none;" />
+          <input id="cb-notes" placeholder="Notes (optional)" style="background:rgba(2,8,5,0.92);border:1px solid var(--border);color:#fff;border-radius:8px;padding:7px 9px;font-size:11px;outline:none;" />
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+            <span id="cb-msg" class="mono" style="font-size:10.5px; color:var(--muted);">Ready.</span>
+            <button type="button" class="btn-sm mono" onclick="saveContact()">💾 SAVE NODE</button>
+          </div>
+        </div>
+      </details>
     </aside>
   </div>
 
@@ -847,6 +878,7 @@ function findContactByHash(hash) {
 function detectGhostUri(raw) {
   const v = (raw || '').trim();
   if (!v) return null;
+  if (/^bifrost-pair:\/\//i.test(v)) return v;
   if (/^bifrost-card:\/\//i.test(v)) return v;
   const hybrid = v.match(/#ip=([^\s]+)/i);
   if (hybrid && hybrid[1]) return 'ironpass://' + hybrid[1].replace(/^\/+/, '');
@@ -873,11 +905,12 @@ function updateOmniboxMode() {
   }
   const ag = GHOST_AGENTS[activeAgent] || GHOST_AGENTS.heimdal;
   const detected = detectGhostUri(input.value);
-  const isCard = Boolean(detected && detected.startsWith('bifrost-card://'));
+  const isPair = Boolean(detected && /^bifrost-pair:\/\//i.test(detected));
+  const isCard = Boolean(detected && /^bifrost-card:\/\//i.test(detected));
   const isUri = Boolean(detected);
   form.classList.toggle('mode-uri', isUri);
-  icon.textContent = isCard ? '📒' : (isUri ? '🔒' : '✦');
-  if (!isBusy) btn.textContent = isCard ? 'IMPORT CARD →' : (isUri ? 'OPEN URI →' : `${ag.callsign} ↵`);
+  icon.textContent = isPair ? '⚡' : (isCard ? '★' : (isUri ? '🔒' : '✦'));
+  if (!isBusy) btn.textContent = isPair ? 'PAIR REALM →' : (isCard ? 'SAVE NODE →' : (isUri ? 'OPEN URI →' : `${ag.callsign} ↵`));
 }
 
 function toggleThinking() {
@@ -945,10 +978,19 @@ async function handleOmnibox(e) {
   const raw = input.value.trim();
   if (!raw || isBusy) return;
   const uri = detectGhostUri(raw);
+  if (uri && /^bifrost-pair:\/\//i.test(uri)) {
+    input.value = '';
+    updateOmniboxMode();
+    openContacts();
+    importPairLink(uri);
+    return;
+  }
   if (uri && uri.startsWith('bifrost-card://')) {
     input.value = '';
     updateOmniboxMode();
     openContacts();
+    const det = document.getElementById('manual-node-details');
+    if (det) det.open = true;
     document.getElementById('cb-card').value = uri;
     parseInviteCardInput();
     return;
@@ -1042,9 +1084,18 @@ function handleDecodedQrPayload(raw) {
     setTimeout(() => { window.location.href = dest; }, 350);
     return true;
   }
+  if (/^bifrost-pair:\/\//i.test(txt)) {
+    if (st) { st.style.color = 'var(--lime)'; st.textContent = '✓ BIFROST REALM PAIR QR DETECTED — Syncing relays, dock & nodes...'; }
+    closeQrScanner();
+    openContacts();
+    importPairLink(txt);
+    return true;
+  }
   if (/^bifrost-card:\/\//i.test(txt)) {
     closeQrScanner();
     openContacts();
+    const det = document.getElementById('manual-node-details');
+    if (det) det.open = true;
     document.getElementById('cb-card').value = txt;
     parseInviteCardInput();
     return true;
@@ -1153,9 +1204,74 @@ window.addEventListener('paste', (ev) => {
     }
   }
 });
+let latestPairToken = '';
+
+async function loadPairBundle() {
+  const box = document.getElementById('pair-qr-box');
+  const meta = document.getElementById('pair-meta');
+  try {
+    const r = await fetch(`/api/pair/export?_t=${Date.now()}`);
+    const d = await r.json();
+    if (d && d.ok) {
+      latestPairToken = d.token || '';
+      if (box && d.qr_svg) box.innerHTML = d.qr_svg;
+      if (meta) meta.textContent = `Bundles ${d.relay_count || 0} relay(s) · ${d.node_count || 0} saved node(s) · ${d.bookmark_count || 0} dock app(s)`;
+    }
+  } catch (e) {
+    if (meta) meta.textContent = `QR unavailable: ${e}`;
+  }
+}
+
+async function copyPairLink() {
+  if (!latestPairToken) await loadPairBundle();
+  if (!latestPairToken) return;
+  const ok = await copyTextSafe(latestPairToken);
+  const btn = document.getElementById('copy-pair-btn');
+  if (btn) {
+    btn.textContent = ok ? '✓ PAIR LINK COPIED!' : '📋 COPY PAIR LINK';
+    setTimeout(() => { btn.textContent = '📋 COPY PAIR LINK'; }, 2200);
+  }
+}
+
+async function importPairLink(overrideToken = '') {
+  const inp = document.getElementById('pair-import-input');
+  const msg = document.getElementById('pair-import-msg');
+  const token = (overrideToken || (inp ? inp.value : '') || '').trim();
+  if (!token) return;
+  if (msg) { msg.style.color = 'var(--muted)'; msg.textContent = 'Pairing BIFROST Realm...'; }
+  try {
+    const r = await fetch(`/api/pair/import?token=${encodeURIComponent(token)}&_t=${Date.now()}`);
+    const d = await r.json();
+    if (!d.ok) {
+      if (msg) { msg.style.color = 'var(--danger)'; msg.textContent = d.error || 'Invalid pair link.'; }
+      return;
+    }
+    if (inp) inp.value = '';
+    if (msg) {
+      msg.style.color = 'var(--lime)';
+      msg.textContent = `✓ Paired! Connected ${d.relays_total || 0} relay(s), imported ${d.nodes_added || 0} node(s) & ${d.bookmarks_saved || 0} dock app(s).`;
+    }
+    refreshContacts();
+    refreshPeers();
+    loadPairBundle();
+  } catch (e) {
+    if (window.ipc && window.ipc.postMessage) {
+      window.ipc.postMessage(JSON.stringify({ cmd: 'import_pair', token }));
+      if (inp) inp.value = '';
+      if (msg) { msg.style.color = 'var(--lime)'; msg.textContent = '✓ Paired via native IPC! Connecting relays...'; }
+      setTimeout(() => { refreshContacts(); refreshPeers(); loadPairBundle(); }, 500);
+    } else if (msg) {
+      msg.style.color = 'var(--danger)';
+      msg.textContent = `Pairing error: ${e}`;
+    }
+  }
+}
+
 function openContacts(prefillHash = '', prefillLabel = '') {
   document.getElementById('contacts-backdrop').classList.add('open');
   if (prefillHash) {
+    const det = document.getElementById('manual-node-details');
+    if (det) det.open = true;
     document.getElementById('cb-hash').value = prefillHash;
     const existing = findContactByHash(prefillHash);
     if (existing) {
@@ -1168,9 +1284,10 @@ function openContacts(prefillHash = '', prefillLabel = '') {
       document.getElementById('cb-petname').value = slug;
       document.getElementById('cb-notes').value = '';
     }
-    document.getElementById('cb-msg').textContent = 'Review petname & click Save.';
+    document.getElementById('cb-msg').textContent = 'Review short name & click Save.';
   }
   refreshContacts();
+  loadPairBundle();
 }
 function closeContacts() { document.getElementById('contacts-backdrop').classList.remove('open'); }
 function parseInviteCardInput() {
@@ -1207,7 +1324,7 @@ async function refreshContacts() {
     const d = await r.json();
     savedContacts = d.contacts || [];
     const btn = document.getElementById('contacts-btn');
-    if (btn) btn.textContent = `📒 CONTACTS (${savedContacts.length})`;
+    if (btn) btn.textContent = '⚡ PAIR DEVICE';
     renderContactsList();
   } catch (e) {}
 }

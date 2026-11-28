@@ -13,6 +13,7 @@ mod cache;
 mod contacts;
 mod dpp;
 mod ghost_tools;
+mod pairing;
 mod sandbox;
 mod ui;
 
@@ -174,6 +175,73 @@ fn copy_to_system_clipboard(text: &str) -> bool {
         }
     }
     false
+}
+
+async fn apply_pair_token(raw_token: &str, client: &Arc<CitadelRnsClient>) -> Result<serde_json::Value, String> {
+    let bundle = pairing::decode_pair_token(raw_token)?;
+    let mut relays_added = 0usize;
+    let mut saved_relays = load_saved_relays();
+    for r in &bundle.r {
+        let t = r.trim();
+        if !t.is_empty() && t.contains(':') {
+            if !saved_relays.iter().any(|x| x == t) {
+                saved_relays.push(t.to_string());
+                relays_added += 1;
+            }
+            client.connect_peer(t).await;
+        }
+    }
+    if relays_added > 0 {
+        save_relays(&saved_relays);
+    }
+
+    let mut nodes_added = 0usize;
+    for [pet, label, hash, scheme, path] in &bundle.n {
+        if contacts::is_valid_hash(hash) {
+            let _ = contacts::upsert_contact(contacts::Contact {
+                petname: pet.clone(),
+                label: label.clone(),
+                hash: hash.to_ascii_lowercase(),
+                scheme: scheme.clone(),
+                path: path.clone(),
+                notes: "Paired via BIFROST Realm".into(),
+                updated_at: 0,
+            });
+            nodes_added += 1;
+        }
+    }
+
+    let mut bookmarks_saved = 0usize;
+    if !bundle.b.is_empty() {
+        let mut bms = pairing::load_bookmarks();
+        for [label, uri, icon] in &bundle.b {
+            if !label.trim().is_empty() && !uri.trim().is_empty() {
+                if let Some(ex) = bms.iter_mut().find(|x| x.uri == *uri) {
+                    ex.label = label.clone();
+                    if !icon.is_empty() {
+                        ex.icon = icon.clone();
+                    }
+                } else {
+                    bms.push(pairing::PairBookmark {
+                        label: label.clone(),
+                        uri: uri.clone(),
+                        icon: icon.clone(),
+                        tone: String::new(),
+                    });
+                }
+                bookmarks_saved += 1;
+            }
+        }
+        let _ = pairing::save_bookmarks(&bms);
+    }
+
+    Ok(serde_json::json!({
+        "ok": true,
+        "relays_added": relays_added,
+        "relays_total": saved_relays.len(),
+        "nodes_added": nodes_added,
+        "bookmarks_saved": bookmarks_saved,
+    }))
 }
 
 fn resolve_llm_api_key(cli_opt: Option<String>) -> Option<String> {
@@ -786,6 +854,50 @@ fn spawn_mesh_handler(
                     }
                     return;
                 }
+            }
+            if path == "/api/pair/export" || path.starts_with("/api/pair/export?") {
+                let mut relays = client.configured_peers().await;
+                for r in load_saved_relays() {
+                    if !relays.iter().any(|x| x == &r) {
+                        relays.push(r);
+                    }
+                }
+                let saved_nodes = contacts::load_contacts();
+                let mut bms = pairing::load_bookmarks();
+                if bms.is_empty() {
+                    for c in saved_nodes.iter().take(5) {
+                        bms.push(pairing::PairBookmark {
+                            label: if c.label.is_empty() { c.petname.clone() } else { c.label.clone() },
+                            uri: format!("{}://{}{}", if c.scheme.is_empty() { "bifrost" } else { &c.scheme }, c.hash, if c.path.is_empty() { "/" } else { &c.path }),
+                            icon: "🔒".into(),
+                            tone: "".into(),
+                        });
+                    }
+                }
+                let token = pairing::encode_pair_token(&relays, &saved_nodes, &bms);
+                let qr_svg = pairing::render_pair_qr_svg(&token);
+                let out = serde_json::json!({
+                    "ok": true,
+                    "token": token,
+                    "qr_svg": qr_svg,
+                    "relay_count": relays.len(),
+                    "node_count": saved_nodes.len(),
+                    "bookmark_count": bms.len(),
+                    "client_id": client.client_id(),
+                });
+                responder.respond(json_response(StatusCode::OK, out.to_string()));
+                return;
+            }
+            if path == "/api/pair/import" || path.starts_with("/api/pair/import?") {
+                let token = path
+                    .split_once('?')
+                    .and_then(|(_, q)| parse_query_param(q, "token"))
+                    .unwrap_or_else(|| String::from_utf8_lossy(&body).trim().to_string());
+                match apply_pair_token(&token, &client).await {
+                    Ok(out) => responder.respond(json_response(StatusCode::OK, out.to_string())),
+                    Err(e) => responder.respond(json_response(StatusCode::BAD_REQUEST, serde_json::json!({ "ok": false, "error": e }).to_string())),
+                }
+                return;
             }
             if path == "/api/copy" || path.starts_with("/api/copy?") {
                 let text = path
@@ -1403,6 +1515,15 @@ fn main() -> Result<()> {
                 "copy_text" => {
                     let text = v.get("text").and_then(|s| s.as_str()).unwrap_or("");
                     let _ = copy_to_system_clipboard(text);
+                }
+                "import_pair" => {
+                    let token = v.get("token").and_then(|s| s.as_str()).unwrap_or("").to_string();
+                    if !token.is_empty() {
+                        let c = Arc::clone(&client_ipc);
+                        rt_ipc.spawn(async move {
+                            let _ = apply_pair_token(&token, &c).await;
+                        });
+                    }
                 }
                 _ => {}
             }
