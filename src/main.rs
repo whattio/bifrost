@@ -124,8 +124,21 @@ struct MeshCtx {
 const ICON_BIFROST_PNG: &[u8] = include_bytes!("../assets/bifrost-128.png");
 const ICON_CITADEL_PNG: &[u8] = include_bytes!("../assets/citadel-128.png");
 const ICON_IRONPASS_PNG: &[u8] = include_bytes!("../assets/ironpass-128.png");
+const ICON_BOT_HEIMDAL_PNG: &[u8] = include_bytes!("../assets/bot-heimdal.png");
+const ICON_BOT_S3C_PNG: &[u8] = include_bytes!("../assets/bot-s3c.png");
+const ICON_BOT_ANDVARI_PNG: &[u8] = include_bytes!("../assets/bot-andvari.png");
+const ICON_BOT_BROKK_PNG: &[u8] = include_bytes!("../assets/bot-brokk.png");
 const ICON_BIFROST_RGBA64: &[u8] = include_bytes!("../assets/bifrost-64.rgba");
 const JSQR_BUNDLE: &[u8] = include_bytes!("../assets/jsqr.js");
+
+fn ghost_agent_system_prompt(agent: &str) -> &'static str {
+    match agent {
+        "s3c" => "You are @S3-C, Ghost-Cleared Citadel Zero-IP Security Sentinel operating inside BIFROST on local sovereign silicon (0 open ports, 0 cloud calls, 0 DNS). You specialize in nftables hardening, 512-bit Curve25519 (X25519 + Ed25519) Reticulum security, IFAC masking, Lock 2 Ed25519 allowlists, and defense-in-depth across Fiber, Starlink, 5G, and Sub-GHz LoRa. Be sharp, tactical, and concise.",
+        "andvari" => "You are ANDVARI, Ghost-Cleared Master Forger of IronPass & IronPass Ledger operating inside BIFROST on local sovereign silicon (0 cloud calls, 0 DNS). You specialize in EU ESPR / CIRPASS-2 Digital Product Passports, hash-chained GS1 EPCIS 2.0 event ledgers, NXP NTAG 424 DNA AES-128 CMAC hardware identity, Hybrid #ip= tags, and air-gapped Ed25519 signing vaults. Be precise and practical.",
+        "brokk" => "You are BROKK, Ghost-Cleared Silicon, Edge AI & RF Engineer operating inside BIFROST on local sovereign silicon (0 cloud calls, 0 DNS). You specialize in Ventuno Q 40 TOPS NPU appliances, MIMIR local super-LLM Linux GPU servers (32 GB VRAM NVIDIA Ubuntu & 128 GB DGX Spark), clean-room MIT Rust Reticulum networking, and out-of-band Sub-GHz LoRa (868/915 MHz) C2 nodes. Be concrete and direct.",
+        _ => "You are HEIMDAL, Ghost-Cleared Guardian of the Bifrost & Sovereign Orchestrator running locally on hardware owned by the operator inside an encrypted, zero-IP Reticulum Ghost Realm (zero cloud calls, zero DNS, zero telemetry, zero cookies). You guide operators across BIFROST, 0-port Linux enclaves, IronPass DPPs, and the Ghost Special Force (@S3-C, Andvari, Brokk). Be calm, authoritative, accurate, and concise.",
+    }
+}
 
 fn resolve_llm_api_key(cli_opt: Option<String>) -> Option<String> {
     if let Some(k) = cli_opt {
@@ -493,6 +506,22 @@ fn spawn_mesh_handler(
                 responder.respond(png_response(ICON_IRONPASS_PNG));
                 return;
             }
+            if path == "/icons/bot-heimdal.png" {
+                responder.respond(png_response(ICON_BOT_HEIMDAL_PNG));
+                return;
+            }
+            if path == "/icons/bot-s3c.png" {
+                responder.respond(png_response(ICON_BOT_S3C_PNG));
+                return;
+            }
+            if path == "/icons/bot-andvari.png" {
+                responder.respond(png_response(ICON_BOT_ANDVARI_PNG));
+                return;
+            }
+            if path == "/icons/bot-brokk.png" {
+                responder.respond(png_response(ICON_BOT_BROKK_PNG));
+                return;
+            }
             if path == "/js/jsqr.js" {
                 let resp = Response::builder()
                     .status(StatusCode::OK)
@@ -761,6 +790,11 @@ fn spawn_mesh_handler(
                     .get("enable_thinking")
                     .and_then(|v| v.as_bool())
                     .unwrap_or(false);
+                let agent = req_json
+                    .get("agent")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("heimdal")
+                    .to_ascii_lowercase();
 
                 let mut messages: Vec<serde_json::Value> = req_json
                     .get("messages")
@@ -780,7 +814,7 @@ fn spawn_mesh_handler(
                         0,
                         serde_json::json!({
                             "role": "system",
-                            "content": "You are a Sovereign AI running locally on the user's own hardware inside an encrypted, zero-IP Bifrost Reticulum network (zero public cloud calls, zero telemetry, zero cookies). Be accurate, direct, and concise."
+                            "content": ghost_agent_system_prompt(&agent)
                         }),
                     );
                 }
@@ -874,6 +908,7 @@ fn spawn_mesh_handler(
 
                         let out = serde_json::json!({
                             "ok": true,
+                            "agent": agent,
                             "reply": reply,
                             "thinking": thinking,
                             "model": resp_model,

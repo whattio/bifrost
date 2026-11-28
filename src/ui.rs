@@ -81,14 +81,98 @@ pub const HOME_HTML: &str = r##"<!DOCTYPE html>
   .qlink.amber { border-color: rgba(245,158,11,0.34); color: #fde68a; }
 
   .stage {
-    flex: 1; width: 100%; max-width: 820px; margin: 0 auto; padding: 0 22px 32px;
+    --agent-color: #84cc16;
+    --agent-glow: rgba(132, 204, 22, 0.22);
+    --agent-soft: rgba(132, 204, 22, 0.14);
+    flex: 1; width: 100%; max-width: 820px; margin: 0 auto; padding: 0 22px 24px;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
   }
   .stage.chat-active { justify-content: flex-start; padding-top: 8px; }
 
+  @keyframes orbitSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  .council-strip {
+    display: flex; align-items: center; justify-content: center; gap: 14px;
+    margin-bottom: 18px; flex-wrap: wrap; transition: all 0.22s ease;
+  }
+  .stage.chat-active .council-strip {
+    gap: 8px; margin-bottom: 10px; width: 100%; justify-content: flex-start;
+  }
+  .bot-medallion {
+    position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px;
+    padding: 8px 12px 7px; border-radius: 15px;
+    background: rgba(8, 17, 13, 0.56); border: 1px solid rgba(148, 198, 168, 0.12);
+    color: #93b0a0; cursor: pointer; opacity: 0.68;
+    transition: transform 0.2s ease, opacity 0.2s ease, border-color 0.22s ease, background 0.22s ease, box-shadow 0.22s ease;
+  }
+  .stage.chat-active .bot-medallion {
+    flex-direction: row; padding: 4px 10px 4px 5px; border-radius: 999px; gap: 7px;
+  }
+  .bot-medallion:hover {
+    opacity: 0.96; transform: translateY(-2px);
+    border-color: var(--m-color, rgba(132, 204, 22, 0.48)); color: #fff;
+  }
+  .bot-medallion.active {
+    opacity: 1; transform: translateY(-2px);
+    background: radial-gradient(circle at 50% 30%, var(--m-soft, rgba(132, 204, 22, 0.16)), rgba(6, 15, 11, 0.92));
+    border-color: var(--m-color, #84cc16);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.52), 0 0 22px var(--m-glow, rgba(132, 204, 22, 0.24));
+    color: #fff;
+  }
+  .bot-orb {
+    position: relative; width: 50px; height: 50px; border-radius: 50%; padding: 2px;
+    background: rgba(4, 11, 8, 0.96); border: 1.5px solid rgba(148, 198, 168, 0.24);
+    transition: all 0.2s ease;
+  }
+  .stage.chat-active .bot-orb { width: 24px; height: 24px; padding: 1px; }
+  .bot-medallion.active .bot-orb {
+    border-color: var(--m-color, #84cc16);
+    box-shadow: 0 0 16px var(--m-glow, rgba(132, 204, 22, 0.35));
+  }
+  .bot-medallion.active .bot-orb::after {
+    content: ''; position: absolute; inset: -5px; border-radius: 50%;
+    border: 1px dashed var(--m-color, #84cc16); opacity: 0.58;
+    animation: orbitSpin 12s linear infinite; pointer-events: none;
+  }
+  .stage.chat-active .bot-medallion.active .bot-orb::after { display: none; }
+  .bot-orb img {
+    width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block;
+    filter: saturate(0.8) brightness(0.88); transition: filter 0.2s ease;
+  }
+  .bot-medallion:hover .bot-orb img, .bot-medallion.active .bot-orb img { filter: saturate(1.1) brightness(1.04); }
+  .bot-name { font-size: 11px; font-weight: 800; letter-spacing: 0.08em; line-height: 1; }
+  .bot-role { font-size: 9.5px; color: #759685; letter-spacing: 0.03em; line-height: 1; }
+  .bot-medallion.active .bot-role { color: #d1fae5; }
+  .stage.chat-active .bot-role { display: none; }
+
+  .msg-agent-head {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 8px; padding-bottom: 7px; border-bottom: 1px solid rgba(148, 198, 168, 0.14);
+  }
+  .msg-agent-head img {
+    width: 24px; height: 24px; border-radius: 50%; object-fit: cover;
+    border: 1px solid rgba(132, 204, 22, 0.55);
+  }
+  .msg-agent-callsign { font-size: 11.5px; font-weight: 800; letter-spacing: 0.08em; }
+  .msg-agent-tag {
+    margin-left: auto; font-size: 9.5px; padding: 2px 7px; border-radius: 999px;
+    background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.3); color: #6ee7b7;
+  }
+  .prompts-row {
+    margin-top: 16px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; max-width: 740px;
+  }
+  .stage.chat-active .prompts-row { display: none; }
+  .prompt-chip {
+    background: rgba(12, 23, 17, 0.78); border: 1px solid var(--border); color: #b7d2c2;
+    border-radius: 999px; padding: 7px 14px; font-size: 12px; cursor: pointer; transition: all 0.15s ease;
+  }
+  .prompt-chip:hover { background: rgba(132, 204, 22, 0.13); border-color: rgba(132, 204, 22, 0.45); color: #ecfccb; }
+  .typing { display: inline-flex; align-items: center; gap: 8px; color: #a7f3d0; font-size: 12.5px; }
+  .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--lime); animation: pulseAnim 1.1s infinite ease-in-out; }
+  @keyframes pulseAnim { 0%, 100% { opacity: 0.3; transform: scale(0.85); } 50% { opacity: 1; transform: scale(1.2); } }
+
   .hero-brand {
     display: flex; flex-direction: column; align-items: center; gap: 10px;
-    margin-bottom: 28px; text-align: center;
+    margin-bottom: 24px; text-align: center;
   }
   .stage.chat-active .hero-brand {
     flex-direction: row; margin-bottom: 14px; width: 100%; justify-content: space-between;
@@ -113,15 +197,16 @@ pub const HOME_HTML: &str = r##"<!DOCTYPE html>
     border-radius: 999px; padding: 7px 9px 7px 18px;
     box-shadow: 0 12px 38px rgba(0,0,0,0.45); transition: border-color 0.18s ease, box-shadow 0.18s ease;
   }
-  .omnibox:focus-within { border-color: rgba(132,204,22,0.68); box-shadow: 0 14px 44px rgba(0,0,0,0.55), 0 0 28px rgba(132,204,22,0.16); }
-  .omnibox.mode-uri:focus-within { border-color: rgba(56,189,248,0.72); }
-  .omni-icon { font-size: 18px; color: var(--lime); width: 22px; text-align: center; flex-shrink: 0; }
+  .omnibox:focus-within { border-color: var(--agent-color, #84cc16); box-shadow: 0 14px 44px rgba(0,0,0,0.55), 0 0 28px var(--agent-glow, rgba(132,204,22,0.22)); }
+  .omnibox.mode-uri:focus-within { border-color: rgba(56,189,248,0.72); box-shadow: 0 14px 44px rgba(0,0,0,0.55), 0 0 28px rgba(56,189,248,0.18); }
+  .omni-icon { font-size: 18px; color: var(--agent-color, #84cc16); width: 22px; text-align: center; flex-shrink: 0; }
   .omnibox.mode-uri .omni-icon { color: var(--holo); }
   .omnibox input { flex: 1; background: transparent; border: none; outline: none; color: #fff; font-size: 15.5px; padding: 9px 4px; min-width: 0; }
   .omnibox input::placeholder { color: #6f8b7b; }
   .omni-submit {
     border: none; border-radius: 999px; padding: 10px 18px; font-size: 12.5px; font-weight: 800;
-    cursor: pointer; background: linear-gradient(135deg, #84cc16, #10b981); color: #031108; flex-shrink: 0;
+    cursor: pointer; background: linear-gradient(135deg, var(--agent-color, #84cc16), #10b981); color: #031108; flex-shrink: 0;
+    transition: transform 0.12s ease, opacity 0.15s ease, background 0.2s ease;
   }
   .omnibox.mode-uri .omni-submit { background: linear-gradient(135deg, #38bdf8, #0ea5e9); color: #02121c; }
   .omni-hint { margin-top: 10px; text-align: center; font-size: 11.5px; color: #6b8777; }
@@ -221,22 +306,47 @@ pub const HOME_HTML: &str = r##"<!DOCTYPE html>
       <button type="button" class="new-chat-btn mono" onclick="resetChat()">✦ NEW CHAT</button>
     </div>
 
+    <div class="council-strip" id="council-strip" role="tablist" aria-label="Ghost-Cleared Special Force">
+      <button type="button" class="bot-medallion active" data-agent="heimdal" style="--m-color:#84cc16;--m-glow:rgba(132,204,22,0.28);--m-soft:rgba(132,204,22,0.16);" onclick="selectAgent('heimdal')">
+        <div class="bot-orb"><img src="bifrost://home/icons/bot-heimdal.png" alt="Heimdal" /></div>
+        <span class="bot-name mono">HEIMDAL</span>
+        <span class="bot-role mono">Bifrost Guardian</span>
+      </button>
+      <button type="button" class="bot-medallion" data-agent="s3c" style="--m-color:#22c55e;--m-glow:rgba(34,197,94,0.30);--m-soft:rgba(34,197,94,0.16);" onclick="selectAgent('s3c')">
+        <div class="bot-orb"><img src="bifrost://home/icons/bot-s3c.png" alt="@S3-C" /></div>
+        <span class="bot-name mono">@S3-C</span>
+        <span class="bot-role mono">Citadel Sentinel</span>
+      </button>
+      <button type="button" class="bot-medallion" data-agent="andvari" style="--m-color:#f59e0b;--m-glow:rgba(245,158,11,0.30);--m-soft:rgba(245,158,11,0.16);" onclick="selectAgent('andvari')">
+        <div class="bot-orb"><img src="bifrost://home/icons/bot-andvari.png" alt="Andvari" /></div>
+        <span class="bot-name mono">ANDVARI</span>
+        <span class="bot-role mono">IronPass Forger</span>
+      </button>
+      <button type="button" class="bot-medallion" data-agent="brokk" style="--m-color:#38bdf8;--m-glow:rgba(56,189,248,0.30);--m-soft:rgba(56,189,248,0.16);" onclick="selectAgent('brokk')">
+        <div class="bot-orb"><img src="bifrost://home/icons/bot-brokk.png" alt="Brokk" /></div>
+        <span class="bot-name mono">BROKK</span>
+        <span class="bot-role mono">Silicon &amp; RF</span>
+      </button>
+    </div>
+
     <div class="omnibox-wrap">
       <form class="omnibox" id="omnibox-form" onsubmit="handleOmnibox(event)">
-        <span class="omni-icon" id="omni-icon">🔒</span>
+        <span class="omni-icon" id="omni-icon">✦</span>
         <input
           id="omni-input"
           autocomplete="off"
           autofocus
-          placeholder="Enter bifrost://<hash>/, ironpass://<hash>/dpp/..., @petname, Hybrid #ip= QR, or ask local AI..."
+          placeholder="Summon Heimdal · Guardian of the Bifrost — or enter bifrost://, ironpass://, @s3-c..."
           oninput="updateOmniboxMode()"
         />
-        <button type="submit" class="omni-submit mono" id="omni-submit">GO ↵</button>
+        <button type="submit" class="omni-submit mono" id="omni-submit">HEIMDAL ↵</button>
       </form>
       <div class="omni-hint mono">
-        Zero-IP Reticulum browsing over <code>bifrost://</code> &amp; <code>ironpass://</code> · Connect any 0-port <code>citadel-vault-daemon</code> peer or local NPU/Ollama AI node.
+        Ghost-Cleared Special Force · 100% local silicon (Ventuno Q NPU / MIMIR) · Type <code>@s3-c</code>, <code>@andvari</code>, <code>@brokk</code>, or any <code>bifrost://</code> / <code>#ip=</code> URI.
       </div>
     </div>
+
+    <div class="prompts-row" id="prompts-row"></div>
 
     <section class="chat-thread" id="chat-thread" aria-live="polite"></section>
   </main>
@@ -416,6 +526,111 @@ let llmModel = 'qwen3-4b-npu';
 let savedContacts = [];
 let latestPeers = [];
 let myClientId = '';
+let activeAgent = 'heimdal';
+
+const GHOST_AGENTS = {
+  heimdal: {
+    id: 'heimdal',
+    callsign: 'HEIMDAL',
+    role: 'Bifrost Guardian',
+    icon: 'bifrost://home/icons/bot-heimdal.png',
+    color: '#84cc16',
+    glow: 'rgba(132, 204, 22, 0.28)',
+    soft: 'rgba(132, 204, 22, 0.16)',
+    placeholder: 'Summon Heimdal · Guardian of the Bifrost — or enter bifrost://, ironpass://, @s3-c...',
+    prompts: [
+      ['Why 0-port BIFROST for CIRPASS-2?', 'Why does BIFROST with 0 open ports beat a regular HTTPS browser for CIRPASS-2 Digital Product Passports?'],
+      ['The Zen of BIFROST in 3 lines', 'Summarize The Zen of BIFROST and how it complements Asgaard without duplicating an OS.'],
+      ['Ventuno Q to MIMIR scaling', 'How does local sovereign AI inside BIFROST scale from a Ventuno Q 40 TOPS NPU to MIMIR 32GB/128GB Linux nodes?'],
+    ],
+  },
+  s3c: {
+    id: 's3c',
+    callsign: '@S3-C',
+    role: 'Citadel Sentinel',
+    icon: 'bifrost://home/icons/bot-s3c.png',
+    color: '#22c55e',
+    glow: 'rgba(34, 197, 94, 0.30)',
+    soft: 'rgba(34, 197, 94, 0.16)',
+    placeholder: 'Summon @S3-C · Citadel Zero-IP Security Sentinel (0 open ports, IFAC, Lock 2)...',
+    prompts: [
+      ['Explain 0-port [CITADEL-DROP]', 'Explain how nftables [CITADEL-DROP] with outbound Reticulum links eliminates public attack surfaces.'],
+      ['Lock 1 IFAC vs Lock 2 Ed25519', 'Compare Lock 1 IFAC dark-network masking and Lock 2 mutual Ed25519 client allowlists in Citadel.'],
+      ['Zero-IP failover over LoRa', 'How does Citadel maintain C2 and kill-switches over 868/915 MHz LoRa when Fiber and 5G go dark?'],
+    ],
+  },
+  andvari: {
+    id: 'andvari',
+    callsign: 'ANDVARI',
+    role: 'IronPass Forger',
+    icon: 'bifrost://home/icons/bot-andvari.png',
+    color: '#f59e0b',
+    glow: 'rgba(245, 158, 11, 0.30)',
+    soft: 'rgba(245, 158, 11, 0.16)',
+    placeholder: 'Summon Andvari · IronPass EU ESPR, Hybrid #ip= & GS1 EPCIS 2.0 Ledger Forger...',
+    prompts: [
+      ['How Hybrid #ip= tags split tiers', 'Explain how a Hybrid IronPass tag splits public EU ESPR consumer data from the classified IronPass Ledger over Reticulum.'],
+      ['NTAG 424 DNA anti-cloning', 'How does NXP NTAG 424 DNA AES-128 CMAC SUN verification prevent physical product tag cloning offline?'],
+      ['Hash-chained GS1 EPCIS 2.0', 'Why is a hash-chained, Ed25519-signed GS1 EPCIS 2.0 IronPass Ledger tamper-evident without a public blockchain?'],
+    ],
+  },
+  brokk: {
+    id: 'brokk',
+    callsign: 'BROKK',
+    role: 'Silicon & RF',
+    icon: 'bifrost://home/icons/bot-brokk.png',
+    color: '#38bdf8',
+    glow: 'rgba(56, 189, 248, 0.30)',
+    soft: 'rgba(56, 189, 248, 0.16)',
+    placeholder: 'Summon Brokk · Ventuno Q NPU, MIMIR GPU enclaves & Sub-GHz LoRa hardware...',
+    prompts: [
+      ['Multi-Ventuno scaling blueprint', 'How do we scale multiple Ventuno Q 40 TOPS NPU boxes inside one zero-IP BIFROST enclave?'],
+      ['LoRa vs broadband RNS links', 'Explain the bandwidth boundary between 868 MHz LoRa (~1.7 kbps SF9) and Starlink/Fiber Reticulum links.'],
+      ['Hardware crypto on ARMv8 & x86', 'How do ARMv8 AES/SHA2 extensions on Ventuno Q and AES-NI on x86 accelerate clean-room Rust Reticulum?'],
+    ],
+  },
+};
+
+function renderStarterPrompts() {
+  const row = document.getElementById('prompts-row');
+  if (!row) return;
+  const ag = GHOST_AGENTS[activeAgent] || GHOST_AGENTS.heimdal;
+  row.innerHTML = ag.prompts.map(([label, prompt]) =>
+    `<button type="button" class="prompt-chip" onclick="askPreset(${JSON.stringify(prompt).replace(/"/g, '&quot;')})">${escHtml(label)}</button>`
+  ).join('');
+}
+
+function selectAgent(id, focusInput = true) {
+  if (!GHOST_AGENTS[id]) return;
+  activeAgent = id;
+  const ag = GHOST_AGENTS[id];
+  const stage = document.getElementById('stage');
+  if (stage) {
+    stage.style.setProperty('--agent-color', ag.color);
+    stage.style.setProperty('--agent-glow', ag.glow);
+    stage.style.setProperty('--agent-soft', ag.soft);
+  }
+  document.querySelectorAll('.bot-medallion').forEach(b => {
+    b.classList.toggle('active', b.getAttribute('data-agent') === id);
+  });
+  const inp = document.getElementById('omni-input');
+  if (inp) {
+    inp.placeholder = ag.placeholder;
+    if (focusInput) inp.focus();
+  }
+  renderStarterPrompts();
+  updateOmniboxMode();
+}
+
+function detectMentionAgent(raw) {
+  const v = (raw || '').trim().toLowerCase();
+  if (v.startsWith('@s3-c') || v.startsWith('@s3c')) return 's3c';
+  if (v.startsWith('@andvari')) return 'andvari';
+  if (v.startsWith('@brokk')) return 'brokk';
+  if (v.startsWith('@heimdal')) return 'heimdal';
+  return null;
+}
+
 async function copyTextSafe(text) {
   if (!text) return false;
   try {
@@ -483,12 +698,17 @@ function updateOmniboxMode() {
   const form = document.getElementById('omnibox-form');
   const icon = document.getElementById('omni-icon');
   const btn = document.getElementById('omni-submit');
+  const mentioned = detectMentionAgent(input.value);
+  if (mentioned && mentioned !== activeAgent) {
+    selectAgent(mentioned, false);
+  }
+  const ag = GHOST_AGENTS[activeAgent] || GHOST_AGENTS.heimdal;
   const detected = detectGhostUri(input.value);
   const isCard = Boolean(detected && detected.startsWith('bifrost-card://'));
   const isUri = Boolean(detected);
   form.classList.toggle('mode-uri', isUri);
   icon.textContent = isCard ? '📒' : (isUri ? '🔒' : '✦');
-  if (!isBusy) btn.textContent = isCard ? 'IMPORT CARD →' : (isUri ? 'OPEN URI →' : 'ASK AI ↵');
+  if (!isBusy) btn.textContent = isCard ? 'IMPORT CARD →' : (isUri ? 'OPEN URI →' : `${ag.callsign} ↵`);
 }
 
 function toggleThinking() {
@@ -509,7 +729,18 @@ function appendMessage(role, content, meta = null) {
   wrap.className = `msg ${role}`;
   const bubble = document.createElement('div');
   bubble.className = 'bubble';
-  bubble.innerHTML = escHtml(content).replace(/\n/g, '<br/>');
+  if (role === 'assistant') {
+    const ag = GHOST_AGENTS[(meta && meta.agent) || activeAgent] || GHOST_AGENTS.heimdal;
+    bubble.style.borderColor = ag.glow;
+    bubble.innerHTML += `
+      <div class="msg-agent-head">
+        <img src="${ag.icon}" alt="${escHtml(ag.callsign)}" style="border-color:${ag.color};" />
+        <span class="msg-agent-callsign mono" style="color:${ag.color};">${escHtml(ag.callsign)}</span>
+        <span class="mono" style="font-size:10px;color:var(--muted);">· ${escHtml(ag.role)}</span>
+        <span class="msg-agent-tag mono">GHOST-CLEARED · LOCAL SILICON</span>
+      </div>`;
+  }
+  bubble.innerHTML += escHtml(content).replace(/\n/g, '<br/>');
   wrap.appendChild(bubble);
   if (role === 'assistant' && meta) {
     const prov = document.createElement('div');
@@ -526,7 +757,17 @@ function resetChat() {
   conversation.length = 0;
   document.getElementById('chat-thread').innerHTML = '';
   document.getElementById('stage').classList.remove('chat-active');
-  document.getElementById('omni-input').focus();
+  const inp = document.getElementById('omni-input');
+  inp.value = '';
+  updateOmniboxMode();
+  inp.focus();
+}
+
+function askPreset(text) {
+  const input = document.getElementById('omni-input');
+  input.value = text;
+  updateOmniboxMode();
+  handleOmnibox(new Event('submit'));
 }
 
 async function handleOmnibox(e) {
@@ -546,13 +787,24 @@ async function handleOmnibox(e) {
   if (uri) { if (window.__bifrostShowTransit) window.__bifrostShowTransit(uri); window.location.href = uri; return; }
 
   input.value = '';
+  updateOmniboxMode();
   appendMessage('user', raw);
   conversation.push({ role: 'user', content: raw });
   isBusy = true;
-  document.getElementById('omni-submit').disabled = true;
+  const submitBtn = document.getElementById('omni-submit');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'AI...';
+
+  const ag = GHOST_AGENTS[activeAgent] || GHOST_AGENTS.heimdal;
+  const thread = document.getElementById('chat-thread');
+  const pending = document.createElement('div');
+  pending.className = 'msg assistant';
+  pending.innerHTML = `<div class="bubble" style="border-color:${ag.glow};"><span class="typing mono"><img src="${ag.icon}" style="width:20px;height:20px;border-radius:50%;border:1px solid ${ag.color};" /><span class="pulse" style="background:${ag.color};"></span>Summoning ${escHtml(ag.callsign)} over encrypted Reticulum → Local Silicon (${escHtml(llmModel)})...</span></div>`;
+  thread.appendChild(pending);
+  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
 
   try {
-    const bodyStr = JSON.stringify({ model: llmModel, enable_thinking: enableThinking, messages: conversation.slice(-12) });
+    const bodyStr = JSON.stringify({ agent: activeAgent, model: llmModel, enable_thinking: enableThinking, messages: conversation.slice(-12) });
     const encoded = encodeURIComponent(bodyStr);
     const r = encoded.length <= 6000
       ? await fetch(`/api/ai-chat?payload=${encoded}&_t=${Date.now()}`)
@@ -562,13 +814,15 @@ async function handleOmnibox(e) {
           body: bodyStr,
         });
     const d = await r.json();
+    pending.remove();
     if (!d.ok) appendMessage('error', d.error || 'Local AI peer unavailable.');
     else { conversation.push({ role: 'assistant', content: d.reply || '' }); appendMessage('assistant', d.reply || '', d); }
   } catch (err) {
+    pending.remove();
     appendMessage('error', `Reticulum transport error: ${err}`);
   } finally {
     isBusy = false;
-    document.getElementById('omni-submit').disabled = false;
+    submitBtn.disabled = false;
     updateOmniboxMode();
   }
 }
@@ -1066,6 +1320,7 @@ async function refreshPeers() {
   }
 }
 
+selectAgent('heimdal', false);
 refreshContacts();
 refreshPeers();
 setInterval(refreshPeers, 3000);
