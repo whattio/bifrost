@@ -447,9 +447,9 @@ pub const HOME_HTML: &str = r##"<!DOCTYPE html>
       <div class="peer-card" style="border-color:rgba(56,189,248,0.42);">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
           <div class="mono" style="font-size:11px;font-weight:800;color:#7dd3fc;">🔑 MY DEVICE ED25519 CLIENT ID (LOCK 2)</div>
-          <button type="button" class="btn-sm mono" onclick="copyMyClientId()">📋 COPY ID</button>
+          <button type="button" class="btn-sm mono" id="copy-cid-btn" onclick="copyMyClientId()">📋 COPY ID</button>
         </div>
-        <div class="hash-box mono" id="my-client-id">loading...</div>
+        <input id="my-client-id" class="hash-box mono" readonly value="loading..." onclick="this.select(); copyMyClientId();" style="width:100%;cursor:pointer;outline:none;" title="Click to select & copy your 32-hex Ed25519 Client ID" />
         <div class="mono" style="font-size:10px;color:var(--muted);">Share this ID with a private vault owner (<code>allowed_clients.txt</code>) to authorize this device.</div>
       </div>
       <div class="peer-card" style="border-color:rgba(132,204,22,0.38);">
@@ -779,36 +779,59 @@ function detectMentionAgent(raw) {
 
 async function copyTextSafe(text) {
   if (!text) return false;
-  try {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      await navigator.clipboard.writeText(text);
-      return true;
-    }
-  } catch (_) {}
+  let copied = false;
+  // 1. Synchronous WebKit/GTK execCommand FIRST (must stay inside user click gesture!)
   try {
     const ta = document.createElement('textarea');
     ta.value = text;
-    ta.setAttribute('readonly', '');
     ta.style.position = 'fixed';
-    ta.style.opacity = '0';
+    ta.style.top = '0';
+    ta.style.left = '0';
+    ta.style.opacity = '0.01';
     document.body.appendChild(ta);
     ta.focus();
     ta.select();
-    const ok = document.execCommand('copy');
+    ta.setSelectionRange(0, text.length);
+    copied = Boolean(document.execCommand('copy'));
     ta.remove();
-    return Boolean(ok);
-  } catch (_) {
-    return false;
+  } catch (_) {}
+  // 2. Native Rust OS clipboard via IPC (pbcopy on macOS, wl-copy/xclip on Linux)
+  try {
+    if (window.ipc && window.ipc.postMessage) {
+      window.ipc.postMessage(JSON.stringify({ cmd: 'copy_text', text }));
+    }
+  } catch (_) {}
+  try {
+    const r = await fetch(`/api/copy?text=${encodeURIComponent(text)}&_t=${Date.now()}`);
+    const d = await r.json();
+    if (d && d.ok) copied = true;
+  } catch (_) {}
+  // 3. Standard Clipboard API fallback
+  if (!copied) {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        copied = true;
+      }
+    } catch (_) {}
   }
+  return copied;
 }
 
 async function copyMyClientId() {
   if (!myClientId) return;
-  const m = document.getElementById('cb-msg');
+  const el = document.getElementById('my-client-id');
+  if (el && el.select) { el.focus(); el.select(); }
   const ok = await copyTextSafe(myClientId);
+  const btn = document.getElementById('copy-cid-btn');
+  if (btn) {
+    btn.textContent = ok ? '✓ COPIED!' : '📋 SELECTED (Ctrl/Cmd+C)';
+    setTimeout(() => { btn.textContent = '📋 COPY ID'; }, 2000);
+  }
+  const m = document.getElementById('cb-msg');
   if (m) {
     m.style.color = 'var(--lime)';
-    m.textContent = ok ? 'Copied your Ed25519 Device ID!' : `Device ID: ${myClientId}`;
+    m.textContent = ok ? `Copied Ed25519 Device ID: ${myClientId}` : `Selected — press Ctrl+C / Cmd+C: ${myClientId}`;
   }
 }
 
@@ -1375,7 +1398,7 @@ async function refreshPeers() {
     if (d.client_id) {
       myClientId = d.client_id;
       const cidEl = document.getElementById('my-client-id');
-      if (cidEl) cidEl.textContent = d.client_id;
+      if (cidEl) { cidEl.value = d.client_id; cidEl.textContent = d.client_id; }
     }
     const relaysEl = document.getElementById('relays-list');
     if (relaysEl) {

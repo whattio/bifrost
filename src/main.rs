@@ -141,6 +141,41 @@ fn ghost_agent_system_prompt(agent: &str) -> &'static str {
     }
 }
 
+fn copy_to_system_clipboard(text: &str) -> bool {
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+    if text.is_empty() {
+        return false;
+    }
+    #[cfg(target_os = "macos")]
+    let candidates: &[(&str, &[&str])] = &[("/usr/bin/pbcopy", &[])];
+    #[cfg(not(target_os = "macos"))]
+    let candidates: &[(&str, &[&str])] = &[
+        ("wl-copy", &[]),
+        ("xclip", &["-selection", "clipboard"]),
+        ("xsel", &["--clipboard", "--input"]),
+    ];
+    for (bin, args) in candidates {
+        if let Ok(mut child) = Command::new(bin)
+            .args(*args)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+        {
+            if let Some(mut stdin) = child.stdin.take() {
+                let _ = stdin.write_all(text.as_bytes());
+            }
+            if let Ok(st) = child.wait() {
+                if st.success() {
+                    return true;
+                }
+            }
+        }
+    }
+    false
+}
+
 fn resolve_llm_api_key(cli_opt: Option<String>) -> Option<String> {
     if let Some(k) = cli_opt {
         let trimmed = k.trim().to_string();
@@ -752,6 +787,15 @@ fn spawn_mesh_handler(
                     return;
                 }
             }
+            if path == "/api/copy" || path.starts_with("/api/copy?") {
+                let text = path
+                    .split_once('?')
+                    .and_then(|(_, q)| parse_query_param(q, "text"))
+                    .unwrap_or_default();
+                let ok = copy_to_system_clipboard(&text);
+                responder.respond(json_response(StatusCode::OK, serde_json::json!({ "ok": ok }).to_string()));
+                return;
+            }
             if path == "/api/ghost-tool" || path.starts_with("/api/ghost-tool?") {
                 let tool = path
                     .split_once('?')
@@ -1355,6 +1399,10 @@ fn main() -> Result<()> {
                 }
                 "clear_cache" => {
                     let _ = cache::clear();
+                }
+                "copy_text" => {
+                    let text = v.get("text").and_then(|s| s.as_str()).unwrap_or("");
+                    let _ = copy_to_system_clipboard(text);
                 }
                 _ => {}
             }
