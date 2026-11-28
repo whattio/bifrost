@@ -160,12 +160,41 @@ pub const HOME_HTML: &str = r##"<!DOCTYPE html>
   .prompts-row {
     margin-top: 16px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; max-width: 740px;
   }
-  .stage.chat-active .prompts-row { display: none; }
+  .stage.chat-active .prompts-row { margin-top: 8px; max-width: 100%; justify-content: flex-start; }
+  .stage.chat-active .prompt-chip:not(.tool-chip) { display: none; }
   .prompt-chip {
+    display: inline-flex; align-items: center; gap: 6px;
     background: rgba(12, 23, 17, 0.78); border: 1px solid var(--border); color: #b7d2c2;
     border-radius: 999px; padding: 7px 14px; font-size: 12px; cursor: pointer; transition: all 0.15s ease;
   }
-  .prompt-chip:hover { background: rgba(132, 204, 22, 0.13); border-color: rgba(132, 204, 22, 0.45); color: #ecfccb; }
+  .prompt-chip:hover { background: rgba(132, 204, 22, 0.13); border-color: var(--agent-color, #84cc16); color: #fff; }
+  .prompt-chip.tool-chip {
+    border-color: var(--agent-glow, rgba(132, 204, 22, 0.38));
+    background: linear-gradient(135deg, var(--agent-soft, rgba(132, 204, 22, 0.14)), rgba(8, 17, 13, 0.88));
+    color: #ecfdf5; font-weight: 700;
+  }
+  .prompt-chip.tool-chip .t-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--agent-color, #84cc16); box-shadow: 0 0 8px var(--agent-color, #84cc16);
+  }
+  .tool-card-title { font-size: 10.5px; font-weight: 800; letter-spacing: 0.1em; color: var(--agent-color, #84cc16); margin-bottom: 6px; }
+  .tool-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 7px; margin: 10px 0; }
+  .tool-metric { background: rgba(3, 9, 6, 0.88); border: 1px solid rgba(148, 198, 168, 0.16); border-radius: 10px; padding: 7px 10px; }
+  .tool-metric-lbl { font-size: 9px; letter-spacing: 0.08em; color: #759685; margin-bottom: 2px; }
+  .tool-metric-val { font-size: 12.5px; font-weight: 800; color: #e2f5ea; word-break: break-word; }
+  .tool-metric-val.lime { color: #bef264; }
+  .tool-metric-val.cyan { color: #7dd3fc; }
+  .tool-metric-val.amber { color: #fcd34d; }
+  .tool-snap-wrap { margin: 10px 0; border-radius: 12px; overflow: hidden; border: 1px solid var(--agent-glow, rgba(132, 204, 22, 0.42)); background: #020604; }
+  .tool-snap-wrap img { display: block; width: 100%; max-height: 360px; object-fit: contain; }
+  .tool-list { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+  .tool-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 7px 10px; border-radius: 9px; background: rgba(4, 11, 8, 0.88);
+    border: 1px solid rgba(148, 198, 168, 0.16); font-size: 11.5px; color: #d1fae5; text-decoration: none;
+  }
+  .tool-row:hover { border-color: var(--agent-color, #84cc16); color: #fff; }
+  .tool-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
   .typing { display: inline-flex; align-items: center; gap: 8px; color: #a7f3d0; font-size: 12.5px; }
   .pulse { width: 8px; height: 8px; border-radius: 50%; background: var(--lime); animation: pulseAnim 1.1s infinite ease-in-out; }
   @keyframes pulseAnim { 0%, 100% { opacity: 0.3; transform: scale(0.85); } 50% { opacity: 1; transform: scale(1.2); } }
@@ -538,10 +567,12 @@ const GHOST_AGENTS = {
     glow: 'rgba(132, 204, 22, 0.28)',
     soft: 'rgba(132, 204, 22, 0.16)',
     placeholder: 'Summon Heimdal · Guardian of the Bifrost — or enter bifrost://, ironpass://, @s3-c...',
+    tools: [
+      { id: 'mesh_peers', label: '⚡ Mesh Status' },
+      { id: 'camera_snap', label: '📷 0-Port Cam Snap' },
+    ],
     prompts: [
-      ['Why 0-port BIFROST for CIRPASS-2?', 'Why does BIFROST with 0 open ports beat a regular HTTPS browser for CIRPASS-2 Digital Product Passports?'],
-      ['The Zen of BIFROST in 3 lines', 'Summarize The Zen of BIFROST and how it complements Asgaard without duplicating an OS.'],
-      ['Ventuno Q to MIMIR scaling', 'How does local sovereign AI inside BIFROST scale from a Ventuno Q 40 TOPS NPU to MIMIR 32GB/128GB Linux nodes?'],
+      ['✦ Summarize live mesh', 'Summarize our live Reticulum mesh status and explain how BIFROST complements Asgaard with 0 open ports.'],
     ],
   },
   s3c: {
@@ -553,10 +584,12 @@ const GHOST_AGENTS = {
     glow: 'rgba(34, 197, 94, 0.30)',
     soft: 'rgba(34, 197, 94, 0.16)',
     placeholder: 'Summon @S3-C · Citadel Zero-IP Security Sentinel (0 open ports, IFAC, Lock 2)...',
+    tools: [
+      { id: 'citadel_shield', label: '⚡ Shield Audit' },
+      { id: 'citadel_breakout', label: '🔥 eBPF Breakout Test' },
+    ],
     prompts: [
-      ['Explain 0-port [CITADEL-DROP]', 'Explain how nftables [CITADEL-DROP] with outbound Reticulum links eliminates public attack surfaces.'],
-      ['Lock 1 IFAC vs Lock 2 Ed25519', 'Compare Lock 1 IFAC dark-network masking and Lock 2 mutual Ed25519 client allowlists in Citadel.'],
-      ['Zero-IP failover over LoRa', 'How does Citadel maintain C2 and kill-switches over 868/915 MHz LoRa when Fiber and 5G go dark?'],
+      ['✦ Brief live threat posture', 'Using live telemetry from our 0-port Citadel node, summarize our firewall drops, Lock 1 IFAC, and Lock 2 Ed25519 posture.'],
     ],
   },
   andvari: {
@@ -568,10 +601,12 @@ const GHOST_AGENTS = {
     glow: 'rgba(245, 158, 11, 0.30)',
     soft: 'rgba(245, 158, 11, 0.16)',
     placeholder: 'Summon Andvari · IronPass EU ESPR, Hybrid #ip= & GS1 EPCIS 2.0 Ledger Forger...',
+    tools: [
+      { id: 'forge_inventory', label: '⚡ Passport Vault' },
+      { id: 'forge_identity', label: '⚡ Forge Identity' },
+    ],
     prompts: [
-      ['How Hybrid #ip= tags split tiers', 'Explain how a Hybrid IronPass tag splits public EU ESPR consumer data from the classified IronPass Ledger over Reticulum.'],
-      ['NTAG 424 DNA anti-cloning', 'How does NXP NTAG 424 DNA AES-128 CMAC SUN verification prevent physical product tag cloning offline?'],
-      ['Hash-chained GS1 EPCIS 2.0', 'Why is a hash-chained, Ed25519-signed GS1 EPCIS 2.0 IronPass Ledger tamper-evident without a public blockchain?'],
+      ['✦ Audit Hybrid #ip= tiers', 'Using our live IronPass Forge & Vault inventory, explain how Hybrid #ip= tags separate public EU ESPR passports from the signed IronPass Ledger.'],
     ],
   },
   brokk: {
@@ -583,10 +618,12 @@ const GHOST_AGENTS = {
     glow: 'rgba(56, 189, 248, 0.30)',
     soft: 'rgba(56, 189, 248, 0.16)',
     placeholder: 'Summon Brokk · Ventuno Q NPU, MIMIR GPU enclaves & Sub-GHz LoRa hardware...',
+    tools: [
+      { id: 'silicon_telemetry', label: '⚡ Silicon & Thermal' },
+      { id: 'rns_ping', label: '⚡ RNS Link Ping' },
+    ],
     prompts: [
-      ['Multi-Ventuno scaling blueprint', 'How do we scale multiple Ventuno Q 40 TOPS NPU boxes inside one zero-IP BIFROST enclave?'],
-      ['LoRa vs broadband RNS links', 'Explain the bandwidth boundary between 868 MHz LoRa (~1.7 kbps SF9) and Starlink/Fiber Reticulum links.'],
-      ['Hardware crypto on ARMv8 & x86', 'How do ARMv8 AES/SHA2 extensions on Ventuno Q and AES-NI on x86 accelerate clean-room Rust Reticulum?'],
+      ['✦ Multi-Ventuno & MIMIR scaling', 'Using our live silicon telemetry, outline how to scale from Ventuno Q 40 TOPS NPUs to MIMIR 32GB/128GB nodes plus Sub-GHz LoRa failover.'],
     ],
   },
 };
@@ -595,9 +632,118 @@ function renderStarterPrompts() {
   const row = document.getElementById('prompts-row');
   if (!row) return;
   const ag = GHOST_AGENTS[activeAgent] || GHOST_AGENTS.heimdal;
-  row.innerHTML = ag.prompts.map(([label, prompt]) =>
+  const toolBtns = (ag.tools || []).map(t =>
+    `<button type="button" class="prompt-chip tool-chip mono" onclick="runGhostTool('${t.id}', '${ag.id}')"><span class="t-dot"></span>${escHtml(t.label)}</button>`
+  ).join('');
+  const promptBtns = (ag.prompts || []).map(([label, prompt]) =>
     `<button type="button" class="prompt-chip" onclick="askPreset(${JSON.stringify(prompt).replace(/"/g, '&quot;')})">${escHtml(label)}</button>`
   ).join('');
+  row.innerHTML = toolBtns + promptBtns;
+}
+
+async function runGhostTool(toolId, agentId = activeAgent) {
+  if (isBusy) return;
+  if (agentId && agentId !== activeAgent) selectAgent(agentId, false);
+  const ag = GHOST_AGENTS[activeAgent] || GHOST_AGENTS.heimdal;
+  const stage = document.getElementById('stage');
+  const thread = document.getElementById('chat-thread');
+  stage.classList.add('chat-active');
+
+  isBusy = true;
+  const btn = document.getElementById('omni-submit');
+  if (btn) { btn.disabled = true; btn.textContent = 'MCP...'; }
+
+  const pending = document.createElement('div');
+  pending.className = 'msg assistant';
+  pending.innerHTML = `<div class="bubble" style="border-color:${ag.glow};"><span class="typing mono"><img src="${ag.icon}" style="width:20px;height:20px;border-radius:50%;border:1px solid ${ag.color};" /><span class="pulse" style="background:${ag.color};"></span>${escHtml(ag.callsign)} executing Zero-IP Ghost Tool <code>${escHtml(toolId)}</code> over encrypted Reticulum...</span></div>`;
+  thread.appendChild(pending);
+  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+
+  try {
+    const r = await fetch(`/api/ghost-tool?tool=${encodeURIComponent(toolId)}&_t=${Date.now()}`);
+    const d = await r.json();
+    pending.remove();
+    if (!d.ok) {
+      appendMessage('error', d.error || `Ghost Tool '${toolId}' failed.`);
+      return;
+    }
+    const wrap = document.createElement('div');
+    wrap.className = 'msg assistant';
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.style.borderColor = ag.glow;
+
+    let inner = `
+      <div class="msg-agent-head">
+        <img src="${ag.icon}" alt="${escHtml(ag.callsign)}" style="border-color:${ag.color};" />
+        <span class="msg-agent-callsign mono" style="color:${ag.color};">${escHtml(ag.callsign)}</span>
+        <span class="mono" style="font-size:10px;color:var(--muted);">· ${escHtml(ag.role)}</span>
+        <span class="msg-agent-tag mono">LIVE MCP · RETICULUM TOOL</span>
+      </div>
+      <div class="tool-card-title mono">${escHtml(d.title || toolId)}</div>
+      <p>${escHtml(d.summary || '')}</p>
+    `;
+
+    if (Array.isArray(d.metrics) && d.metrics.length) {
+      inner += `<div class="tool-metrics">` + d.metrics.map(m =>
+        `<div class="tool-metric"><div class="tool-metric-lbl mono">${escHtml(m.label)}</div><div class="tool-metric-val mono ${escHtml(m.tone || '')}">${escHtml(m.value)}</div></div>`
+      ).join('') + `</div>`;
+    }
+
+    if (d.image_data_url) {
+      inner += `<div class="tool-snap-wrap"><img src="${d.image_data_url}" alt="0-Port Reticulum Camera Snapshot" /></div>`;
+    }
+
+    if (Array.isArray(d.peers) && d.peers.length) {
+      inner += `<div class="tool-list">` + d.peers.slice(0, 8).map(p =>
+        `<a class="tool-row mono" href="${escHtml(p.uri)}"><span>${p.active ? '🟢' : '🟡'} ${escHtml(p.alias)}</span><span style="color:#7dd3fc;">${escHtml((p.hash || '').slice(0, 12))}… →</span></a>`
+      ).join('') + `</div>`;
+    }
+
+    if (Array.isArray(d.passports) && d.passports.length) {
+      inner += `<div class="tool-list">` + d.passports.slice(0, 10).map(p =>
+        `<a class="tool-row mono" href="${escHtml(p.uri)}"><span>📜 ${escHtml(p.name || p.id)} <span style="color:#759685;">(${escHtml(p.source)})</span></span><span style="color:#fcd34d;">${escHtml(p.badge || 'DPP')} →</span></a>`
+      ).join('') + `</div>`;
+    }
+
+    if (d.code_output) {
+      inner += `<pre><code>${escHtml(d.code_output)}</code></pre>`;
+    }
+
+    inner += `<div class="tool-actions">`;
+    if (d.open_uri) {
+      inner += `<a class="btn-sm mono" style="text-decoration:none;" href="${escHtml(d.open_uri)}">${escHtml(d.open_label || 'OPEN →')}</a>`;
+    }
+    if (d.analysis_prompt) {
+      const qAttr = JSON.stringify(d.analysis_prompt).replace(/"/g, '&quot;');
+      inner += `<button type="button" class="btn-sm mono" style="background:rgba(56,189,248,0.14);color:#bae6fd;border-color:rgba(56,189,248,0.45);" onclick="askPreset(${qAttr})">🧠 ASK ${escHtml(ag.callsign)} TO BRIEF</button>`;
+    }
+    inner += `</div>`;
+
+    bubble.innerHTML = inner;
+    wrap.appendChild(bubble);
+
+    const prov = document.createElement('div');
+    prov.className = 'provenance mono';
+    const shortHash = d.dest_hash ? `${d.dest_hash.slice(0, 8)}…${d.dest_hash.slice(-4)}` : 'in-process';
+    prov.innerHTML = `
+      <span class="hi">⚡ MCP Tool: ${escHtml(toolId)}</span>
+      <span>${d.latency_ms || 0} ms</span>
+      ${d.wire_bytes ? `<span>${d.wire_bytes} B encrypted</span>` : ''}
+      <span>RNS ${escHtml(shortHash)}</span>
+      <span>0 Cloud Calls</span>
+    `;
+    wrap.appendChild(prov);
+    thread.appendChild(wrap);
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+  } catch (err) {
+    pending.remove();
+    appendMessage('error', `Ghost Tool error: ${err}`);
+  } finally {
+    isBusy = false;
+    if (btn) btn.disabled = false;
+    updateOmniboxMode();
+  }
 }
 
 function selectAgent(id, focusInput = true) {

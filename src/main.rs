@@ -12,6 +12,7 @@
 mod cache;
 mod contacts;
 mod dpp;
+mod ghost_tools;
 mod sandbox;
 mod ui;
 
@@ -751,6 +752,24 @@ fn spawn_mesh_handler(
                     return;
                 }
             }
+            if path == "/api/ghost-tool" || path.starts_with("/api/ghost-tool?") {
+                let tool = path
+                    .split_once('?')
+                    .and_then(|(_, q)| parse_query_param(q, "tool"))
+                    .unwrap_or_else(|| "mesh_peers".into());
+                let gctx = ghost_tools::GhostToolContext {
+                    preferred_vault_hash: None,
+                    preferred_forge_hash: None,
+                    llm_hash: ctx.llm_hash.clone(),
+                    llm_model: ctx.llm_model.clone(),
+                    ifac_fingerprint: client.ifac_fingerprint().map(|s| s.to_string()),
+                    client_id: client.client_id().to_string(),
+                };
+                let out = ghost_tools::run_ghost_tool(&tool, &client, &gctx).await;
+                let st = if out["ok"].as_bool().unwrap_or(false) { StatusCode::OK } else { StatusCode::BAD_GATEWAY };
+                responder.respond(json_response(st, out.to_string()));
+                return;
+            }
             if (path == "/api/ai-chat" || path.starts_with("/api/ai-chat?"))
                 && (method.eq_ignore_ascii_case("POST") || method.eq_ignore_ascii_case("GET"))
             {
@@ -810,11 +829,24 @@ fn spawn_mesh_handler(
                     .unwrap_or(false);
 
                 if !has_system {
+                    let gctx = ghost_tools::GhostToolContext {
+                        preferred_vault_hash: None,
+                        preferred_forge_hash: None,
+                        llm_hash: ctx.llm_hash.clone(),
+                        llm_model: ctx.llm_model.clone(),
+                        ifac_fingerprint: client.ifac_fingerprint().map(|s| s.to_string()),
+                        client_id: client.client_id().to_string(),
+                    };
+                    let mut sys_prompt = ghost_agent_system_prompt(&agent).to_string();
+                    if let Some(live_ctx) = ghost_tools::build_live_agent_context(&agent, &client, &gctx).await {
+                        sys_prompt.push_str("\n\n[LIVE ZERO-IP RETICULUM TELEMETRY — USE THESE REAL MEASUREMENTS WHEN RELEVANT]: ");
+                        sys_prompt.push_str(&live_ctx);
+                    }
                     messages.insert(
                         0,
                         serde_json::json!({
                             "role": "system",
-                            "content": ghost_agent_system_prompt(&agent)
+                            "content": sys_prompt
                         }),
                     );
                 }
