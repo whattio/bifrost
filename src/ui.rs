@@ -1074,11 +1074,25 @@ pub const HUD_INIT_SCRIPT: &str = r##"
   }
 
   function shouldTrackUrl(url) {
-    const s = String(url || '');
+    const s = String(url || '').toLowerCase();
     if (!s || s.startsWith('data:') || s.startsWith('blob:')) return false;
-    if (isHomePage && (s.startsWith('/api/') || s.includes('home/api/'))) return false;
-    if (s.includes('/api/peers') || s.includes('/__bifrost_rns/peers') || s.includes('/cam/')) return false;
-    return true;
+    // Never pop the streaming dock for background API/cluster/health/camera polling
+    if (
+      s.includes('/api/') ||
+      s.includes('/__bifrost_rns/') ||
+      s.includes('/cluster') ||
+      s.includes('/health') ||
+      s.includes('/status') ||
+      s.includes('/events') ||
+      s.includes('/cam/')
+    ) {
+      return false;
+    }
+    const clean = s.split('?')[0].split('#')[0];
+    if (clean.includes('/models/') || clean.includes('/assets/') || clean.includes('/_next/static/')) {
+      return true;
+    }
+    return /\.(glb|gltf|obj|stl|ply|wasm|js|mjs|css|png|jpg|jpeg|webp|mp4|pdf)$/i.test(clean);
   }
 
   function injectLoaderStyles() {
