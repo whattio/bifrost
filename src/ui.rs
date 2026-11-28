@@ -127,22 +127,42 @@ pub const HOME_HTML: &str = r##"<!DOCTYPE html>
   .omni-hint { margin-top: 10px; text-align: center; font-size: 11.5px; color: #6b8777; }
   .stage.chat-active .omni-hint { display: none; }
 
-  .shortcuts {
-    margin-top: 26px; display: flex; flex-wrap: wrap; justify-content: center; gap: 14px; max-width: 740px;
+  .bottom-dock-wrap {
+    width: 100%; padding: 8px 20px 14px;
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    z-index: 10; margin-top: auto;
   }
-  .stage.chat-active .shortcuts { display: none; }
-  .shortcut {
-    width: 104px; padding: 12px 6px 10px; border-radius: 14px;
-    display: flex; flex-direction: column; align-items: center; gap: 8px;
+  .ghost-dock {
+    display: inline-flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 6px;
+    padding: 8px 12px; border-radius: 20px;
+    background: rgba(9, 19, 14, 0.86); border: 1px solid rgba(148, 198, 168, 0.22);
+    backdrop-filter: blur(14px);
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.52), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+  .dock-item {
+    min-width: 82px; padding: 7px 10px 6px; border-radius: 13px;
+    display: flex; flex-direction: column; align-items: center; gap: 5px;
     cursor: pointer; background: transparent; border: 1px solid transparent;
-    color: #cfe4d7; text-decoration: none; transition: all 0.15s ease;
+    color: #cfe4d7; text-decoration: none;
+    transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
   }
-  .shortcut:hover { background: rgba(16,31,23,0.85); border-color: var(--border); color: #fff; }
-  .sc-circle {
-    width: 50px; height: 50px; border-radius: 50%; display: grid; place-items: center;
-    font-size: 20px; background: rgba(14,27,20,0.96); border: 1px solid rgba(148,198,168,0.22);
+  .dock-item:hover {
+    transform: translateY(-4px); background: rgba(132, 204, 22, 0.13);
+    border-color: rgba(132, 204, 22, 0.42); color: #fff;
   }
-  .sc-label { font-size: 11.5px; font-weight: 600; text-align: center; line-height: 1.25; }
+  .dock-icon {
+    width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center;
+    font-size: 18px; background: rgba(14, 27, 20, 0.96); border: 1px solid rgba(148, 198, 168, 0.22);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35); overflow: hidden;
+  }
+  .dock-item:hover .dock-icon { border-color: rgba(132, 204, 22, 0.58); }
+  .dock-label { font-size: 10.5px; font-weight: 700; text-align: center; line-height: 1.15; }
+  .crypto-footer {
+    max-width: 820px; text-align: center; font-size: 10.5px; line-height: 1.45;
+    color: #7ca390; padding: 4px 14px; border-radius: 999px;
+    background: rgba(10, 22, 16, 0.62); border: 1px solid rgba(16, 185, 129, 0.22);
+  }
+  .crypto-footer strong { color: #a7f3d0; font-weight: 700; }
 
   .chat-thread { display: none; width: 100%; margin-top: 18px; flex-direction: column; gap: 14px; padding-bottom: 24px; }
   .stage.chat-active .chat-thread { display: flex; }
@@ -184,13 +204,10 @@ pub const HOME_HTML: &str = r##"<!DOCTYPE html>
     <div class="top-right">
       <button type="button" class="top-btn mono" id="think-toggle" onclick="toggleThinking()">🧠 THINK: OFF</button>
       <button type="button" class="top-btn mono" onclick="openQrScanner()" style="border-color:rgba(132,204,22,0.55);color:#bef264;">📷 SCAN QR</button>
-      <a class="top-btn mono" href="bifrost://home/qr-sheet">🖨️ QR TAGS</a>
       <button type="button" class="top-btn mono" id="contacts-btn" onclick="openContacts()" title="Local Sovereign Contact Book (~/.config/bifrost/contacts.json · 0 DNS)">📒 CONTACTS (0)</button>
       <button type="button" class="top-btn mono" id="nodes-btn" onclick="openDrawer()">📡 NODES (0)</button>
     </div>
   </header>
-
-  <nav class="quickbar mono" id="quickbar" aria-label="Direct Reticulum Links"></nav>
 
   <main class="stage" id="stage">
     <div class="hero-brand">
@@ -199,10 +216,7 @@ pub const HOME_HTML: &str = r##"<!DOCTYPE html>
         <div class="wordmark mono">BIFROST</div>
         <span class="mono" style="padding:4px 10px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:0.06em;background:rgba(56,189,248,0.14);border:1px solid rgba(56,189,248,0.5);color:#7dd3fc;">{{BIFROST_SHORT_TAG}}</span>
       </div>
-      <div class="tagline mono">ZERO-IP GHOST BROWSER · POWERED BY RETICULUM · 0 COOKIES · 0 DNS</div>
-      <div class="mono" style="max-width:780px;margin:8px auto 0;padding:7px 14px;border-radius:10px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.28);color:#a7f3d0;font-size:11px;line-height:1.45;">
-        🔒 <strong>Encryption:</strong> Every link is end-to-end encrypted with <strong>512-bit Curve25519</strong> (<strong>X25519</strong> ephemeral key exchange + <strong>Ed25519</strong> signatures) and <strong>AES-256-CBC + HMAC-SHA256</strong> over Reticulum — zero TLS CAs, zero DNS, zero open server ports.
-      </div>
+      <div class="tagline mono">ZERO-IP GHOST BROWSER · POWERED BY RETICULUM · OFF-GRID REALM</div>
       <button type="button" class="new-chat-btn mono" onclick="resetChat()">✦ NEW CHAT</button>
     </div>
 
@@ -213,45 +227,46 @@ pub const HOME_HTML: &str = r##"<!DOCTYPE html>
           id="omni-input"
           autocomplete="off"
           autofocus
-          placeholder="Enter bifrost://<hash>/, ironpass://<hash>/dpp/..., Hybrid #ip= QR, or ask your local AI peer..."
+          placeholder="Enter bifrost://<hash>/, ironpass://<hash>/dpp/..., @petname, Hybrid #ip= QR, or ask local AI..."
           oninput="updateOmniboxMode()"
         />
         <button type="submit" class="omni-submit mono" id="omni-submit">GO ↵</button>
       </form>
       <div class="omni-hint mono">
-        Zero-IP Reticulum browsing over <code>bifrost://</code> &amp; <code>ironpass://</code> · Connect any 0-port <code>citadel-vault-daemon</code> peer or local Ollama/llama.cpp AI node.
+        Zero-IP Reticulum browsing over <code>bifrost://</code> &amp; <code>ironpass://</code> · Connect any 0-port <code>citadel-vault-daemon</code> peer or local NPU/Ollama AI node.
       </div>
-    </div>
-
-    <div class="shortcuts" id="shortcuts">
-      <a class="shortcut" href="bifrost://home/showcase">
-        <div class="sc-circle"><img src="bifrost://home/icons/citadel.png" alt="Microsite Example" style="width:44px;height:44px;border-radius:12px;" /></div>
-        <div class="sc-label">Example Microsite</div>
-      </a>
-      <a class="shortcut" href="ironpass://local-demo/dpp/battery-01">
-        <div class="sc-circle"><img src="bifrost://home/icons/ironpass.png" alt="Battery DPP" style="width:44px;height:44px;border-radius:12px;" /></div>
-        <div class="sc-label">Battery DPP + Ledger</div>
-      </a>
-      <a class="shortcut" href="ironpass://local-demo/dpp/drone-01">
-        <div class="sc-circle">🛸</div>
-        <div class="sc-label">UAV MRO DPP</div>
-      </a>
-      <a class="shortcut" href="ironpass://local-demo/dpp/furniture-01">
-        <div class="sc-circle">🪑</div>
-        <div class="sc-label">ESPR Desk DPP</div>
-      </a>
-      <a class="shortcut" href="bifrost://home/qr-sheet">
-        <div class="sc-circle">🖨️</div>
-        <div class="sc-label">QR Tag Sheet</div>
-      </a>
-      <button type="button" class="shortcut" onclick="openDrawer()">
-        <div class="sc-circle">📡</div>
-        <div class="sc-label">Ghost Nodes</div>
-      </button>
     </div>
 
     <section class="chat-thread" id="chat-thread" aria-live="polite"></section>
   </main>
+
+  <footer class="bottom-dock-wrap">
+    <nav class="ghost-dock" id="quickbar" aria-label="Native Ghost Apps">
+      <a class="dock-item" href="bifrost://home/showcase">
+        <div class="dock-icon"><img src="bifrost://home/icons/citadel.png" alt="Microsite" style="width:36px;height:36px;border-radius:10px;" /></div>
+        <div class="dock-label">Microsite</div>
+      </a>
+      <a class="dock-item" href="ironpass://local-demo/dpp/battery-01">
+        <div class="dock-icon"><img src="bifrost://home/icons/ironpass.png" alt="Battery DPP" style="width:36px;height:36px;border-radius:10px;" /></div>
+        <div class="dock-label">Battery DPP</div>
+      </a>
+      <a class="dock-item" href="ironpass://local-demo/dpp/drone-01">
+        <div class="dock-icon">🛸</div>
+        <div class="dock-label">UAV DPP</div>
+      </a>
+      <a class="dock-item" href="bifrost://home/qr-sheet">
+        <div class="dock-icon">🖨️</div>
+        <div class="dock-label">QR Tags</div>
+      </a>
+      <button type="button" class="dock-item" onclick="openDrawer()">
+        <div class="dock-icon">📡</div>
+        <div class="dock-label">Nodes</div>
+      </button>
+    </nav>
+    <div class="crypto-footer mono">
+      🔒 <strong>512-bit Curve25519</strong> (<strong>X25519</strong> ephemeral ECDH + <strong>Ed25519</strong> auth) · <strong>AES-256-CBC + HMAC-SHA256</strong> over Reticulum · 0 DNS · 0 TLS CAs · 0 Open Ports
+    </div>
+  </footer>
 
   <div class="drawer-backdrop" id="drawer-backdrop" onclick="if(event.target===this) closeDrawer()">
     <aside class="drawer">
@@ -960,14 +975,17 @@ async function refreshPeers() {
       txt.textContent = `LOCAL AI PEER · ${peers.length ? 'OPTIONAL' : 'WAITING FOR PEERS'}`;
     }
 
-    // Dynamic quickbar from ~/.config/bifrost/bookmarks.json or discovered peers
+    // Dynamic bottom Ghost Dock from ~/.config/bifrost/bookmarks.json or discovered peers
     const qb = document.getElementById('quickbar');
-    if (bookmarks.length) {
-      qb.innerHTML = bookmarks.map(b => `<a class="qlink ${escHtml(b.tone||'')}" href="${escHtml(b.uri)}">${escHtml(b.icon||'🔒')} ${escHtml(b.label)}</a>`).join('');
-    } else if (peers.length) {
-      qb.innerHTML = peers.map(p => `<a class="qlink holo" href="bifrost://${p.hash}/">🔒 ${escHtml(p.alias)}</a><a class="qlink amber" href="ironpass://${p.hash}/dpp/demo-01">📜 Demo DPP</a>`).join('');
-    } else {
-      qb.innerHTML = `<a class="qlink holo" href="bifrost://home/showcase">🌐 Example Microsite</a><a class="qlink amber" href="ironpass://local-demo/dpp/battery-01">🔋 Battery DPP + Ledger</a><a class="qlink amber" href="ironpass://local-demo/dpp/drone-01">🛸 UAV DPP</a><a class="qlink" href="bifrost://home/qr-sheet">🖨️ QR Sheet</a>`;
+    if (qb) {
+      if (bookmarks.length) {
+        qb.innerHTML = bookmarks.map(b => `<a class="dock-item" href="${escHtml(b.uri)}"><div class="dock-icon">${escHtml(b.icon||'🔒')}</div><div class="dock-label">${escHtml(b.label)}</div></a>`).join('')
+          + `<button type="button" class="dock-item" onclick="openDrawer()"><div class="dock-icon">📡</div><div class="dock-label">Nodes</div></button>`;
+      } else if (peers.length) {
+        qb.innerHTML = peers.slice(0, 6).map(p => `<a class="dock-item" href="bifrost://${p.hash}/"><div class="dock-icon">🔒</div><div class="dock-label">${escHtml(p.alias.slice(0, 12))}</div></a>`).join('')
+          + `<a class="dock-item" href="bifrost://home/qr-sheet"><div class="dock-icon">🖨️</div><div class="dock-label">QR Tags</div></a>`
+          + `<button type="button" class="dock-item" onclick="openDrawer()"><div class="dock-icon">📡</div><div class="dock-label">Nodes</div></button>`;
+      }
     }
 
     const list = document.getElementById('peers-list');
